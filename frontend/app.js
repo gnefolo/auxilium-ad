@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // del servizio Render (es. https://auxilium-backend.onrender.com/api).
   const API_BASE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
     ? 'http://127.0.0.1:8005/api'
-    : 'https://REPLACE-WITH-RENDER-URL.onrender.com/api';
+    : 'https://auxilium-backend-lq7s.onrender.com/api';
 
   // ------------------------------------------------------------------
   // Autenticazione
