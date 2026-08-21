@@ -1,20 +1,31 @@
 """
-Motore Fase 4: calcola i KPI economici realmente disponibili per cluster di servizio
-(da FactServiceRevenue, dati reali dell'Elenco Servizi) e li affianca al catalogo KPI
-standardizzato (`kpi_catalog.py`).
+Motore Fase 4 (rivisto): SROI delle commesse ATTIVE di Auxilium, per cluster di
+servizio. Diverso dal calcolatore per NUOVI progetti (`project_engine.py`, pagina
+"Calcolo SROI"): qui l'investimento è il valore REALE delle commesse del cluster
+(da FactServiceRevenue) e i benefici sono quelli allineati al cluster con la
+metodologia di monetizzazione (`sroi/benefits_catalog.py`).
 
-I dati di outcome (utenti in carico, ore erogate, valore sociale netto) non esistono
-in questo progetto: possono essere inseriti manualmente dall'utente in dashboard
-(FactClusterOutcome) - una volta inseriti, costo per utente, costo per ora erogata e
-il rapporto SROI si calcolano automaticamente. Il valore sociale netto non è mai
-stimato da questo motore: se non viene inserito a mano, il rapporto SROI resta N/D.
+Le quantità dei benefici (utenti con RSA evitata, ricoveri evitati, ore di
+caregiver risparmiate, ecc.) non sono mai stimate da questo motore: vengono
+inserite manualmente in dashboard e salvate in FactClusterOutcome. Se nessuna
+quantità è stata inserita per un cluster/anno, il rapporto SROI resta N/D - non
+viene mai riempito con un numero non dichiarato.
+
+La "qualità degli indicatori" segnala, per il cluster selezionato, quanta parte
+del catalogo KPI standardizzato è oggi calcolabile con dati reali e quanti dei
+benefici della metodologia hanno già una quantità reale inserita: una misura di
+completezza del monitoraggio, non del valore sociale in sé.
 """
+
+import json
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from database import month_key, DimSite, DimService, FactServiceRevenue, FactClusterOutcome
 from sroi.kpi_catalog import get_catalog, KPI_STATUS_COMPUTABLE
+from sroi.benefits_catalog import get_cluster_benefits
+from sroi.project_engine import compute_benefit_net_value
 
 
 def compute_cluster_economics(db: Session, cluster: str, year: int) -> dict:
@@ -74,17 +85,25 @@ def get_cluster_outcome(db: Session, cluster: str, year: int) -> dict:
         .first()
     )
     if row is None:
-        return {"usersServed": None, "hoursDelivered": None, "netSocialValueEUR": None, "note": None}
+        return {"usersServed": None, "hoursDelivered": None, "benefitQuantities": {}, "note": None}
+
+    quantities = {}
+    if row.BenefitQuantitiesJSON:
+        try:
+            quantities = json.loads(row.BenefitQuantitiesJSON)
+        except (ValueError, TypeError):
+            quantities = {}
+
     return {
         "usersServed": row.UsersServed,
         "hoursDelivered": row.HoursDelivered,
-        "netSocialValueEUR": row.NetSocialValueEUR,
+        "benefitQuantities": quantities,
         "note": row.Note,
     }
 
 
 def save_cluster_outcome(db: Session, cluster: str, year: int, users_served, hours_delivered,
-                          net_social_value_eur, note: str = None) -> dict:
+                          benefit_quantities: dict, note: str = None) -> dict:
     row = (
         db.query(FactClusterOutcome)
         .filter(FactClusterOutcome.ServiceCluster == cluster, FactClusterOutcome.Year == year)
@@ -96,16 +115,35 @@ def save_cluster_outcome(db: Session, cluster: str, year: int, users_served, hou
 
     row.UsersServed = users_served
     row.HoursDelivered = hours_delivered
-    row.NetSocialValueEUR = net_social_value_eur
+    row.BenefitQuantitiesJSON = json.dumps(benefit_quantities or {})
     row.Note = note
     db.commit()
     return get_cluster_outcome(db, cluster, year)
+
+
+def _compute_indicator_quality(catalog: dict, benefit_rows: list) -> dict:
+    all_kpis = catalog["economicKPIs"] + catalog["processQualityKPIs"] + catalog["serviceVolumeKPIs"]
+    kpi_total = len(all_kpis)
+    kpi_computable = sum(1 for k in all_kpis if k["status"] == KPI_STATUS_COMPUTABLE)
+
+    benefit_total = len(benefit_rows)
+    benefit_with_data = sum(1 for b in benefit_rows if b["quantity"])
+
+    return {
+        "kpiCatalogTotal": kpi_total,
+        "kpiCatalogComputable": kpi_computable,
+        "kpiCatalogPct": (kpi_computable / kpi_total * 100) if kpi_total else 0.0,
+        "benefitsTotal": benefit_total,
+        "benefitsWithData": benefit_with_data,
+        "benefitsPct": (benefit_with_data / benefit_total * 100) if benefit_total else 0.0,
+    }
 
 
 def compute_sroi_framework(db: Session, cluster: str, year: int) -> dict:
     economics = compute_cluster_economics(db, cluster, year)
     outcome = get_cluster_outcome(db, cluster, year)
     catalog = get_catalog(cluster)
+    benefit_catalog = get_cluster_benefits(cluster)
 
     valore_commesse = economics["valoreCommesseEUR"]
     costo_per_utente = (
@@ -116,23 +154,41 @@ def compute_sroi_framework(db: Session, cluster: str, year: int) -> dict:
         valore_commesse / outcome["hoursDelivered"]
         if outcome["hoursDelivered"] else None
     )
-    sroi_ratio = (
-        outcome["netSocialValueEUR"] / valore_commesse
-        if (outcome["netSocialValueEUR"] is not None and valore_commesse)
-        else None
-    )
 
-    # Aggiorna lo stato dei due KPI economici collegati, se l'utente ha inserito i dati.
+    quantities = outcome["benefitQuantities"] or {}
+    benefit_rows = []
+    any_quantity_entered = False
+    total_net_value = 0.0
+    for idx, b in enumerate(benefit_catalog["benefits"]):
+        qty = quantities.get(str(idx)) or 0.0
+        if qty:
+            any_quantity_entered = True
+        net_value = compute_benefit_net_value(
+            qty, b["proxyValueEUR"], 1, b["deadweightPct"], b["attributionPct"], b["dropoffPct"]
+        )
+        total_net_value += net_value
+        benefit_rows.append({**b, "benefitIndex": idx, "quantity": qty, "netValueEUR": net_value})
+
+    net_social_value = total_net_value if any_quantity_entered else None
+    sroi_ratio = (total_net_value / valore_commesse) if (any_quantity_entered and valore_commesse) else None
+
+    # Aggiorna lo stato dei due KPI economici collegati, solo su questa copia locale
+    # del catalogo (non sugli oggetti globali - vedi fix in kpi_catalog.get_catalog).
     for item in catalog["economicKPIs"]:
         if item["id"] == "costo_per_utente" and costo_per_utente is not None:
             item["status"] = KPI_STATUS_COMPUTABLE
         if item["id"] == "costo_per_ora_erogata" and costo_per_ora is not None:
             item["status"] = KPI_STATUS_COMPUTABLE
 
+    indicator_quality = _compute_indicator_quality(catalog, benefit_rows)
+
     if sroi_ratio is not None:
-        sroi_status = "Calcolato dal valore sociale netto inserito manualmente - verificarne la fonte prima di pubblicarlo."
+        sroi_status = (
+            "Calcolato dalle quantità reali inserite per i benefici allineati al cluster, con proxy "
+            "finanziarie di metodologia (vedi 'Metodologia di monetizzazione') - non un dato di bilancio."
+        )
     else:
-        sroi_status = "N/D - inserire il valore sociale netto per calcolarlo automaticamente"
+        sroi_status = "N/D - inserire almeno una quantità reale per i benefici del cluster per calcolarlo"
 
     return {
         "cluster": cluster,
@@ -142,14 +198,17 @@ def compute_sroi_framework(db: Session, cluster: str, year: int) -> dict:
         "costoPerUtenteEUR": costo_per_utente,
         "costoPerOraErogataEUR": costo_per_ora,
         "kpiCatalog": catalog,
+        "benefitsCatalog": benefit_catalog,
+        "benefitRows": benefit_rows,
         "sroiRatio": sroi_ratio,
-        "netSocialValueEUR": outcome["netSocialValueEUR"],
+        "netSocialValueEUR": net_social_value,
         "sroiStatus": sroi_status,
+        "indicatorQuality": indicator_quality,
         "methodologyNote": (
-            "Fase 4 - framework semplificato: il costo dell'investimento (valore commesse, "
-            "'economics.valoreCommesseEUR') è reale. Costo/utente, costo/ora erogata e il rapporto "
-            "SROI si calcolano automaticamente se gli utenti in carico, le ore erogate o il valore "
-            "sociale netto vengono inseriti manualmente (pagina SROI). Il valore sociale netto non è "
-            "mai stimato da questa dashboard: chi lo inserisce ne è responsabile."
+            "SROI delle commesse attive: il costo dell'investimento ('economics.valoreCommesseEUR') è "
+            "reale, dal valore delle commesse del cluster. Il valore sociale netto si calcola con la "
+            "stessa metodologia SROI Network usata per i nuovi progetti (deadweight/attribution/drop-off), "
+            "applicata ai benefici allineati al cluster (vedi 'benefitsCatalog'), con le quantità reali "
+            "inserite manualmente in dashboard. Nessuna quantità è mai stimata da questa dashboard."
         ),
     }

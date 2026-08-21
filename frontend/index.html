@@ -342,10 +342,12 @@
         </div>
 
         <div class="sroi-banner" id="sroiBanner">
-          <span class="sroi-banner-label">SROI Ratio</span>
+          <span class="sroi-banner-label">SROI Ratio — commesse attive</span>
           <span class="sroi-banner-value">N/D</span>
           <span class="sroi-banner-note" id="sroiBannerNote"></span>
         </div>
+
+        <div class="quality-bar-row" id="indicatorQualityBar"></div>
 
         <div class="data-grid" style="margin-top:20px;">
           <div class="card glass">
@@ -354,13 +356,12 @@
           </div>
 
           <div class="card glass span-2">
-            <div class="card-header"><h3 class="card-title">Inserisci Dati di Outcome</h3></div>
+            <div class="card-header"><h3 class="card-title">Utenti in carico e ore erogate</h3></div>
             <p class="outcome-form-note">
-              Questi dati non esistono in questo progetto: vivono nel sistema di monitoraggio operativo di Auxilium.
-              Inseriscili qui per calcolare automaticamente costo/utente, costo/ora erogata e il rapporto SROI.
-              Il valore sociale netto non viene stimato da questa dashboard: se lo inserisci, ne sei responsabile.
+              Dati di monitoraggio operativo (non esistono in questo progetto): inseriscili per calcolare
+              automaticamente costo/utente e costo/ora erogata nella tabella KPI economici sotto.
             </p>
-            <div class="outcome-form">
+            <div class="outcome-form" style="grid-template-columns: repeat(2, 1fr);">
               <div class="filter-group">
                 <label for="outcomeUsers">Utenti in carico (anno)</label>
                 <input type="number" id="outcomeUsers" min="0" step="1" placeholder="es. 850">
@@ -369,18 +370,35 @@
                 <label for="outcomeHours">Ore erogate (anno)</label>
                 <input type="number" id="outcomeHours" min="0" step="1" placeholder="es. 120000">
               </div>
-              <div class="filter-group">
-                <label for="outcomeValue">Valore sociale netto (€)</label>
-                <input type="number" id="outcomeValue" min="0" step="1000" placeholder="es. 35000000">
-              </div>
             </div>
-            <div class="filter-group" style="margin-bottom:16px;">
-              <label for="outcomeNote">Nota / fonte della valutazione</label>
-              <input type="text" id="outcomeNote" style="min-width:100%;" placeholder="es. metodo, databank di proxy usata, chi ha validato il dato">
-            </div>
-            <button class="btn btn-primary" id="outcomeSaveBtn">Salva e Calcola</button>
-            <span id="outcomeSaveStatus" style="margin-left:12px; font-size:12px; color: var(--text-muted);"></span>
           </div>
+        </div>
+
+        <div class="card glass" style="margin-top:20px;">
+          <div class="card-header"><h3 class="card-title">Benefici e Metodologia di Monetizzazione</h3></div>
+          <p class="page-subtitle" id="benefitsMethodologyNote" style="margin-bottom:14px;"></p>
+          <div class="table-container">
+            <table class="data-table" id="benefitsTable">
+              <thead>
+                <tr>
+                  <th>Beneficio</th>
+                  <th>Stakeholder</th>
+                  <th>Proxy €/unità</th>
+                  <th>Confidenza</th>
+                  <th>Quantità reale (anno)</th>
+                  <th>Valore netto</th>
+                </tr>
+              </thead>
+              <tbody id="benefitsTableBody"></tbody>
+            </table>
+          </div>
+          <div class="total-row" style="margin-top:8px;"><span>Valore Sociale Netto Totale</span><span id="benefitsTotalValue">N/D</span></div>
+          <div class="filter-group" style="margin: 14px 0;">
+            <label for="outcomeNote">Nota / fonte delle quantità inserite</label>
+            <input type="text" id="outcomeNote" style="min-width:100%;" placeholder="es. da cartelle utente PAI, monitoraggio interno, stima del coordinatore">
+          </div>
+          <button class="btn btn-primary" id="outcomeSaveBtn">Salva Quantità</button>
+          <span id="outcomeSaveStatus" style="margin-left:12px; font-size:12px; color: var(--text-muted);"></span>
         </div>
 
         <div class="card glass" style="margin-top:20px;">
@@ -489,6 +507,12 @@
             <input type="number" id="relDurata" value="3" min="0.5" step="0.5">
           </div>
           <div class="filter-group">
+            <label for="relSroiProject">Progetto "Calcolo SROI" collegato (opzionale)</label>
+            <select id="relSroiProject">
+              <option value="">Nessuno</option>
+            </select>
+          </div>
+          <div class="filter-group">
             <label>&nbsp;</label>
             <button class="btn btn-primary" id="relGeneraBtn">Genera Bozza</button>
           </div>
@@ -527,12 +551,24 @@
           </div>
 
           <div class="card glass" style="margin-top:20px;">
-            <div class="card-header"><h3 class="card-title">3. Framework SROI e KPI di Monitoraggio Proposti</h3></div>
-            <div class="sroi-banner">
-              <span class="sroi-banner-label">SROI Ratio</span>
+            <div class="card-header"><h3 class="card-title">3. SROI, Benefici del Cluster e KPI di Monitoraggio Proposti</h3></div>
+            <div class="sroi-banner" id="relSroiBanner">
+              <span class="sroi-banner-label">SROI Ratio progetto</span>
               <span class="sroi-banner-value">N/D</span>
               <span class="sroi-banner-note" id="relSroiNote"></span>
             </div>
+            <h4 class="kpi-catalog-title">Benefici e Metodologia di Monetizzazione del Cluster</h4>
+            <p class="page-subtitle" id="relBenefitsMethodologyNote" style="margin-bottom:12px;"></p>
+            <div class="table-container">
+              <table class="data-table" id="relBenefitsTable">
+                <thead><tr><th>Beneficio</th><th>Stakeholder</th><th>Proxy €/unità</th><th>Confidenza</th><th>Fonte</th></tr></thead>
+                <tbody id="relBenefitsTableBody"></tbody>
+              </table>
+            </div>
+            <p class="outcome-form-note" style="margin-top:10px;">
+              Per stimare il rapporto SROI di questo specifico progetto con quantità reali, usa la pagina
+              "Calcolo SROI" (crea un progetto con questo stesso cluster) e poi ricollegalo qui.
+            </p>
             <h4 class="kpi-catalog-title">KPI Economici</h4>
             <div class="table-container">
               <table class="data-table" id="relKpiEconomicTable">

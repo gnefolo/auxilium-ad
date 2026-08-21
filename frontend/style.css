@@ -661,6 +661,56 @@ body {
 .status-badge.kpi-ok { background: var(--green-l); color: var(--green-d); }
 .status-badge.kpi-pending { background: var(--n-100); color: var(--text-muted); }
 
+/* Qualità degli indicatori (SROI) */
+.quality-bar-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.quality-meter {
+  background: var(--white);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 12px 16px;
+}
+
+.quality-meter-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.quality-meter-track {
+  height: 6px;
+  border-radius: 4px;
+  background: var(--n-100);
+  overflow: hidden;
+}
+
+.quality-meter-fill {
+  height: 100%;
+  background: var(--green);
+  border-radius: 4px;
+}
+
+.quality-meter-value {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-main);
+  margin-top: 6px;
+}
+
+.benefit-qty-input {
+  width: 90px;
+  padding: 6px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+}
+
 /* Outcome input form (SROI) */
 .outcome-form {
   display: grid;
@@ -879,7 +929,10 @@ body {
   border: 1px solid var(--border-color);
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.1);
-  min-width: 280px;
+  min-width: 320px;
+  max-width: 380px;
+  max-height: 360px;
+  overflow-y: auto;
   z-index: 20;
   padding: 6px;
 }
@@ -892,6 +945,15 @@ body {
 }
 .library-menu-item:hover { background: var(--n-50); }
 .library-menu-item .cat { color: var(--gold-d); font-size: 10px; font-weight: 700; text-transform: uppercase; }
+.library-menu-item .lib-proxy { color: var(--text-muted); font-size: 11px; margin-top: 2px; }
+.library-menu-note {
+  padding: 8px 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
 
 /* Territorio - mappa */
 .leaflet-popup-content { font-family: var(--font-sans); font-size: 12.5px; }

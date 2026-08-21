@@ -85,8 +85,8 @@ document.addEventListener('DOMContentLoaded', () => {
     overview: ['Executive Overview', 'Sintesi delle performance aziendali aggiornata in tempo reale.'],
     gare: ['Gare & Appalti', 'Storico commesse dell\'Elenco Servizi Auxilium, 2015-2024.'],
     footprint: ['Footprint (SAM)', 'Bilanci e impatto macroeconomico diretto, indiretto e indotto, per entità.'],
-    sroi: ['SROI', 'Framework KPI e rapporto SROI per cluster di servizio.'],
-    sroicalc: ['Calcolo SROI', 'Calcolatore SROI rigoroso per progetto: deadweight, attribution e drop-off per beneficio (metodologia SROI Network).'],
+    sroi: ['SROI', 'SROI delle commesse attive di Auxilium, per cluster di servizio, e qualità dei dati di monitoraggio disponibili.'],
+    sroicalc: ['Calcolo SROI', 'Stima lo SROI di un NUOVO progetto/bando per la Relazione Tecnica: benefici allineati al cluster, deadweight, attribution e drop-off (metodologia SROI Network).'],
     territorio: ['Territorio', 'Mappa dei siti e valore delle commesse per territorio, dati reali dell\'Elenco Servizi.'],
     anomalie: ['Anomalie', 'Deviazioni statistiche reali rispetto alla media storica delle commesse.'],
     relazione: ['Genera Relazione', 'Bozza di Relazione Tecnica con track record, impatto SAM e KPI di monitoraggio per un profilo di bando.'],
@@ -613,12 +613,62 @@ document.addEventListener('DOMContentLoaded', () => {
     renderSroi(data);
   }
 
+  const CONFIDENCE_BADGE_CLASS = { ALTA: 'kpi-ok', MEDIA: 'prep', BASSA: 'kpi-pending' };
+
+  function confidenceBadge(level) {
+    const cls = CONFIDENCE_BADGE_CLASS[level] || 'kpi-pending';
+    return `<span class="status-badge ${cls}">${level || 'N/D'}</span>`;
+  }
+
+  function benefitRowHtml(b) {
+    return `
+      <tr class="benefit-ref-row" data-benefit-index="${b.benefitIndex}">
+        <td>
+          <div style="font-weight:600;">${escapeHtml(b.title)}</div>
+          <div style="font-size:11px; color: var(--text-muted);">${escapeHtml(b.category)} · ${escapeHtml(b.unit)}</div>
+          <div style="font-size:10.5px; color: var(--text-muted); margin-top:2px;">${escapeHtml(b.source)}</div>
+        </td>
+        <td style="color: var(--text-muted); font-size:0.9em;">${escapeHtml(b.stakeholder || '-')}</td>
+        <td style="font-family: var(--font-mono);">${formatEUR(b.proxyValueEUR)}</td>
+        <td>${confidenceBadge(b.confidence)}</td>
+        <td><input type="number" class="benefit-qty-input" min="0" step="any" value="${b.quantity || ''}" placeholder="0"></td>
+        <td class="benefit-net-cell" style="font-weight:700;">${formatEUR(b.netValueEUR)}</td>
+      </tr>
+    `;
+  }
+
+  function computeBenefitRowsTotal(rows) {
+    return rows.reduce((sum, b) => sum + computeBenefitNetValueClient(
+      b.quantity, b.proxyValueEUR, 1, b.deadweightPct, b.attributionPct, b.dropoffPct
+    ), 0);
+  }
+
+  function renderIndicatorQuality(q) {
+    const box = document.getElementById('indicatorQualityBar');
+    box.innerHTML = `
+      <div class="quality-meter">
+        <div class="quality-meter-label">Qualità catalogo KPI</div>
+        <div class="quality-meter-track"><div class="quality-meter-fill" style="width:${q.kpiCatalogPct}%"></div></div>
+        <div class="quality-meter-value">${q.kpiCatalogComputable}/${q.kpiCatalogTotal} calcolabili oggi (${q.kpiCatalogPct.toFixed(0)}%)</div>
+      </div>
+      <div class="quality-meter">
+        <div class="quality-meter-label">Benefici con quantità reale inserita</div>
+        <div class="quality-meter-track"><div class="quality-meter-fill" style="width:${q.benefitsPct}%"></div></div>
+        <div class="quality-meter-value">${q.benefitsWithData}/${q.benefitsTotal} benefici (${q.benefitsPct.toFixed(0)}%)</div>
+      </div>
+    `;
+  }
+
+  let currentBenefitRows = [];
+
   function renderSroi(data) {
     const banner = document.getElementById('sroiBanner');
     const calculated = data.sroiRatio !== null && data.sroiRatio !== undefined;
     banner.classList.toggle('calculated', calculated);
-    banner.querySelector('.sroi-banner-value').textContent = calculated ? `${data.sroiRatio.toFixed(2)}x` : 'N/D';
+    banner.querySelector('.sroi-banner-value').textContent = calculated ? `${data.sroiRatio.toFixed(4)}x` : 'N/D';
     document.getElementById('sroiBannerNote').textContent = data.sroiStatus || '';
+
+    renderIndicatorQuality(data.indicatorQuality);
 
     const e = data.economics;
     document.getElementById('sroiEconomics').innerHTML = `
@@ -635,9 +685,26 @@ document.addEventListener('DOMContentLoaded', () => {
     // Precompila il form con quanto già inserito
     document.getElementById('outcomeUsers').value = data.outcome.usersServed ?? '';
     document.getElementById('outcomeHours').value = data.outcome.hoursDelivered ?? '';
-    document.getElementById('outcomeValue').value = data.outcome.netSocialValueEUR ?? '';
     document.getElementById('outcomeNote').value = data.outcome.note ?? '';
     document.getElementById('outcomeSaveStatus').textContent = '';
+
+    document.getElementById('benefitsMethodologyNote').textContent = data.benefitsCatalog.methodologyNote || '';
+    currentBenefitRows = data.benefitRows;
+    document.getElementById('benefitsTableBody').innerHTML = currentBenefitRows.map(benefitRowHtml).join('');
+    document.getElementById('benefitsTotalValue').textContent = data.netSocialValueEUR !== null ? formatEUR(data.netSocialValueEUR) : 'N/D';
+
+    document.querySelectorAll('#benefitsTableBody .benefit-qty-input').forEach(input => {
+      input.addEventListener('input', () => {
+        const row = input.closest('.benefit-ref-row');
+        const idx = parseInt(row.dataset.benefitIndex, 10);
+        const b = currentBenefitRows.find(r => r.benefitIndex === idx);
+        b.quantity = parseFloat(input.value) || 0;
+        const net = computeBenefitNetValueClient(b.quantity, b.proxyValueEUR, 1, b.deadweightPct, b.attributionPct, b.dropoffPct);
+        row.querySelector('.benefit-net-cell').textContent = formatEUR(net);
+        const total = computeBenefitRowsTotal(currentBenefitRows);
+        document.getElementById('benefitsTotalValue').textContent = formatEUR(total);
+      });
+    });
 
     fillKpiTable('#kpiEconomicTable', data.kpiCatalog.economicKPIs, 'def');
     fillKpiTable('#kpiProcessTable', data.kpiCatalog.processQualityKPIs, 'target');
@@ -648,12 +715,15 @@ document.addEventListener('DOMContentLoaded', () => {
   async function saveOutcome() {
     const cluster = document.getElementById('clusterSelect').value;
     const statusEl = document.getElementById('outcomeSaveStatus');
+    const benefitQuantities = {};
+    currentBenefitRows.forEach(b => { if (b.quantity) benefitQuantities[String(b.benefitIndex)] = b.quantity; });
+
     const payload = {
       cluster,
       year: SROI_YEAR,
       usersServed: document.getElementById('outcomeUsers').value ? parseInt(document.getElementById('outcomeUsers').value, 10) : null,
       hoursDelivered: document.getElementById('outcomeHours').value ? parseFloat(document.getElementById('outcomeHours').value) : null,
-      netSocialValueEUR: document.getElementById('outcomeValue').value ? parseFloat(document.getElementById('outcomeValue').value) : null,
+      benefitQuantities,
       note: document.getElementById('outcomeNote').value || null,
     };
 
@@ -678,7 +748,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ------------------------------------------------------------------
   let sroiProjectsCache = [];
   let selectedProjectId = null;
-  let benefitLibraryCache = null;
+  let benefitLibraryCache = {};
 
   const COST_CATEGORIES = ['Personale', 'Materiali', 'Spazi e sedi', 'Altro'];
   const BENEFIT_CATEGORIES = ['Salute', 'Inclusione sociale', 'Occupazione', 'Educazione', 'Caregiver', 'Custom'];
@@ -939,26 +1009,39 @@ document.addEventListener('DOMContentLoaded', () => {
     const libraryMenu = document.getElementById('sroiLibraryMenu');
     libraryBtn.addEventListener('click', async (e) => {
       e.stopPropagation();
-      if (!benefitLibraryCache) {
-        const res = await apiFetch(`${API_BASE}/sroi/benefit-library`);
-        benefitLibraryCache = await res.json();
+      const cluster = document.getElementById('sroiFieldCluster').value || null;
+      const cacheKey = cluster || '__all__';
+      if (!benefitLibraryCache[cacheKey]) {
+        const url = cluster
+          ? `${API_BASE}/sroi/benefits-catalog?cluster=${encodeURIComponent(cluster)}`
+          : `${API_BASE}/sroi/benefits-catalog`;
+        const res = await apiFetch(url);
+        benefitLibraryCache[cacheKey] = await res.json();
       }
-      libraryMenu.innerHTML = benefitLibraryCache.map((item, i) => `
+      const catalog = benefitLibraryCache[cacheKey];
+      const items = cluster
+        ? catalog.benefits
+        : Object.values(catalog.byCluster).flatMap(c => c.benefits.map(b => ({ ...b, _cluster: c.cluster })));
+
+      const noteHtml = `<div class="library-menu-note">${escapeHtml(cluster ? catalog.methodologyNote : catalog.methodologyNote)}</div>`;
+      libraryMenu.innerHTML = noteHtml + items.map((item, i) => `
         <div class="library-menu-item" data-lib-index="${i}">
-          <div class="cat">${item.category}</div>
+          <div class="cat">${escapeHtml(item.category)}${item._cluster ? ' · ' + escapeHtml(item._cluster) : ''}</div>
           <div>${escapeHtml(item.title)}</div>
+          <div class="lib-proxy">${formatEUR(item.proxyValueEUR)} / ${escapeHtml(item.unit)} · confidenza ${escapeHtml(item.confidence)}</div>
         </div>
       `).join('');
       libraryMenu.querySelectorAll('.library-menu-item').forEach(el => {
         el.addEventListener('click', async () => {
-          const item = benefitLibraryCache[parseInt(el.dataset.libIndex, 10)];
+          const item = items[parseInt(el.dataset.libIndex, 10)];
           await apiFetch(`${API_BASE}/sroi/projects/${projectId}/benefits`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               category: item.category, title: item.title, stakeholder: item.stakeholder,
-              note: item.note, quantity: 0, proxyValueEUR: 0, durationYears: 1,
-              deadweightPct: 0, attributionPct: 100, dropoffPct: 0,
+              note: `${item.source} (confidenza: ${item.confidence})`, quantity: 0,
+              proxyValueEUR: item.proxyValueEUR, durationYears: 1,
+              deadweightPct: item.deadweightPct, attributionPct: item.attributionPct, dropoffPct: item.dropoffPct,
             }),
           });
           libraryMenu.style.display = 'none';
@@ -1182,9 +1265,21 @@ document.addEventListener('DOMContentLoaded', () => {
       regioneSelect.innerHTML = '<option value="">Tutte le regioni</option>' +
         regioni.map(r => `<option value="${r}">${r}</option>`).join('');
 
+      clusterSelect.addEventListener('change', refreshRelSroiProjectOptions);
       document.getElementById('relGeneraBtn').addEventListener('click', generateRelazione);
       document.getElementById('relPrintBtn').addEventListener('click', () => window.print());
+      await refreshRelSroiProjectOptions();
     }
+  }
+
+  async function refreshRelSroiProjectOptions() {
+    const cluster = document.getElementById('relCluster').value;
+    const select = document.getElementById('relSroiProject');
+    const res = await apiFetch(`${API_BASE}/sroi/projects`);
+    const projects = await res.json();
+    const matching = projects.filter(p => p.serviceCluster === cluster);
+    select.innerHTML = '<option value="">Nessuno</option>' +
+      matching.map(p => `<option value="${p.id}">${escapeHtml(p.name)} (SROI ${p.sroiRatio !== null ? p.sroiRatio.toFixed(2) + 'x' : 'N/D'})</option>`).join('');
   }
 
   async function generateRelazione() {
@@ -1192,9 +1287,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const regione = document.getElementById('relRegione').value;
     const budget = parseFloat(document.getElementById('relBudget').value) || 0;
     const durata = parseFloat(document.getElementById('relDurata').value) || 1;
+    const sroiProjectId = document.getElementById('relSroiProject').value;
 
     const params = new URLSearchParams({ cluster, budget_eur: budget, durata_anni: durata });
     if (regione) params.set('regione', regione);
+    if (sroiProjectId) params.set('sroi_project_id', sroiProjectId);
 
     const res = await apiFetch(`${API_BASE}/relazione/genera?${params.toString()}`);
     const data = await res.json();
@@ -1259,8 +1356,27 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('relSamSummary').innerHTML = '<div class="stat-row"><span class="stat-label">Impatto non calcolabile per questo budget.</span></div>';
     }
 
-    // 3. KPI catalog
+    // 3. SROI progetto collegato + benefici del cluster + KPI catalog
+    const relBanner = document.getElementById('relSroiBanner');
+    const relCalculated = data.progettoSroiCollegato && data.progettoSroiCollegato.sroiRatio !== null && data.progettoSroiCollegato.sroiRatio !== undefined;
+    relBanner.classList.toggle('calculated', relCalculated);
+    relBanner.querySelector('.sroi-banner-value').textContent = relCalculated ? `${data.progettoSroiCollegato.sroiRatio.toFixed(2)}x` : 'N/D';
     document.getElementById('relSroiNote').textContent = data.sroiStatus;
+
+    document.getElementById('relBenefitsMethodologyNote').textContent = data.benefitsCatalog.methodologyNote || '';
+    document.getElementById('relBenefitsTableBody').innerHTML = data.benefitsCatalog.benefits.map(b => `
+      <tr>
+        <td>
+          <div style="font-weight:600;">${escapeHtml(b.title)}</div>
+          <div style="font-size:11px; color: var(--text-muted);">${escapeHtml(b.category)} · ${escapeHtml(b.unit)}</div>
+        </td>
+        <td style="color: var(--text-muted); font-size:0.9em;">${escapeHtml(b.stakeholder || '-')}</td>
+        <td style="font-family: var(--font-mono);">${formatEUR(b.proxyValueEUR)}</td>
+        <td>${confidenceBadge(b.confidence)}</td>
+        <td style="font-size:11px; color: var(--text-muted);">${escapeHtml(b.source)}</td>
+      </tr>
+    `).join('');
+
     fillKpiTable('#relKpiEconomicTable', data.kpiMonitoraggioProposto.economicKPIs, 'def');
     fillKpiTable('#relKpiProcessTable', data.kpiMonitoraggioProposto.processQualityKPIs, 'target');
     fillKpiTable('#relKpiVolumeTable', data.kpiMonitoraggioProposto.serviceVolumeKPIs, 'def');

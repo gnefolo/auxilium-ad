@@ -159,11 +159,13 @@ class FactRiskActions(Base):
 
 
 class FactClusterOutcome(Base):
-    """Dati di outcome inseriti manualmente dall'utente per cluster/anno (Fase 4+),
-    per completare i KPI del catalogo SROI che non sono altrimenti disponibili in
-    questo progetto (utenti in carico, ore erogate) e, se disponibile, il valore
-    sociale netto già valutato altrove (es. con un metodo SROI/CBA esterno) - questa
-    tabella non calcola né inventa un valore sociale, si limita a registrarlo."""
+    """Dati di outcome delle commesse ATTIVE inseriti manualmente per cluster/anno
+    (Fase 4+): utenti in carico, ore erogate, e le quantità dei benefici monetizzati
+    allineati al cluster (`sroi/benefits_catalog.py`), salvate come JSON in
+    BenefitQuantitiesJSON ({"<indice beneficio>": quantità}). Il valore sociale netto
+    non è mai inventato: viene sempre ricalcolato da queste quantità con la stessa
+    metodologia SROI Network usata per i nuovi progetti (`sroi/project_engine.py`),
+    non stimato o inserito a mano come numero isolato."""
     __tablename__ = "fact_cluster_outcome"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -172,6 +174,7 @@ class FactClusterOutcome(Base):
     UsersServed = Column(Integer, nullable=True)
     HoursDelivered = Column(Float, nullable=True)
     NetSocialValueEUR = Column(Float, nullable=True)
+    BenefitQuantitiesJSON = Column(String, nullable=True)
     Note = Column(String, nullable=True)
 
 

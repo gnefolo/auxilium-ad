@@ -18,6 +18,8 @@ può calcolare oggi (KPI economici, da FactServiceRevenue) e cosa manca (KPI di
 outcome) - senza mai riempire il vuoto con un numero stimato non dichiarato.
 """
 
+import copy
+
 KPI_STATUS_COMPUTABLE = "calcolabile_oggi"
 KPI_STATUS_PENDING = "richiede_dati_monitoraggio"
 
@@ -117,12 +119,16 @@ SERVICE_VOLUME_KPIS = [
 
 
 def get_catalog(cluster: str = None) -> dict:
+    # Copie profonde: chi consuma questo catalogo (es. sroi/engine.py) aggiorna lo
+    # stato "calcolabile_oggi" dei singoli KPI in base ai dati disponibili per una
+    # specifica richiesta cluster/anno - senza copiare, quella mutazione si
+    # propagherebbe permanentemente a tutte le richieste successive (bug corretto).
     return {
         "cluster": cluster,
         "individualPlanLabel": INDIVIDUAL_PLAN_LABEL.get(cluster) if cluster else None,
-        "economicKPIs": ECONOMIC_KPIS,
-        "processQualityKPIs": PROCESS_QUALITY_KPIS,
-        "serviceVolumeKPIs": SERVICE_VOLUME_KPIS,
+        "economicKPIs": copy.deepcopy(ECONOMIC_KPIS),
+        "processQualityKPIs": copy.deepcopy(PROCESS_QUALITY_KPIS),
+        "serviceVolumeKPIs": copy.deepcopy(SERVICE_VOLUME_KPIS),
         "sourceNote": (
             "Indicatori di processo/qualità e di volume di servizio ripresi dal sistema di "
             "monitoraggio già in uso da Auxilium (Relazione Tecnica, gara PNRR M5C2, 23.05.2025), "

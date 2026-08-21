@@ -23,6 +23,7 @@ come indicativa e da validare).
 from sqlalchemy.orm import Session
 
 from database import SroiProject, SroiProjectCost, SroiBenefit
+from sroi.benefits_catalog import get_cluster_benefits, CLUSTER_BENEFITS
 
 
 def compute_benefit_net_value(quantity: float, proxy_eur: float, duration_years: int,
@@ -212,20 +213,25 @@ def delete_benefit(db: Session, project_id: int, benefit_id: int) -> dict:
     return get_project(db, project_id)
 
 
-# Libreria di beneficio di esempio: valori NON validati, servono solo come punto di
-# partenza da modificare - etichettati esplicitamente come indicativi, coerenti con la
-# tassonomia dei cluster di Auxilium (vedi sroi/kpi_catalog.py).
-BENEFIT_LIBRARY = [
-    dict(category="Salute", title="Riduzione ricoveri ospedalieri evitati", stakeholder="Utenti / SSN",
-         proxyValueEUR=None, note="Proxy indicativo: costo medio di un ricovero evitato - da validare con dati ASL/SSN reali"),
-    dict(category="Inclusione sociale", title="Riduzione isolamento anziani", stakeholder="Anziani / Famiglie",
-         proxyValueEUR=None, note="Proxy indicativo: valore attribuito al benessere psicologico/sociale - da validare (es. databank di proxy values)"),
-    dict(category="Inclusione sociale", title="Inclusione persone con disabilità", stakeholder="Persone con disabilità",
-         proxyValueEUR=None, note="Proxy indicativo - da validare"),
-    dict(category="Occupazione", title="Reinserimento lavorativo", stakeholder="Beneficiari",
-         proxyValueEUR=None, note="Proxy indicativo: valore del reddito da lavoro generato - da validare"),
-    dict(category="Educazione", title="Miglioramento esiti scolastici", stakeholder="Minori / Famiglie",
-         proxyValueEUR=None, note="Proxy indicativo - da validare"),
-    dict(category="Caregiver", title="Riduzione carico dei caregiver familiari", stakeholder="Familiari",
-         proxyValueEUR=None, note="Proxy indicativo: valore del tempo di cura risparmiato - da validare"),
-]
+# Libreria di beneficio per il calcolatore SROI di NUOVI progetti (pagina "Calcolo
+# SROI"): a differenza della vecchia libreria generica, è allineata al cluster di
+# servizio del progetto e porta proxy finanziarie reali con fonte dichiarata (vedi
+# sroi/benefits_catalog.py per la metodologia completa). Restano comunque valori
+# di partenza da adattare al progetto specifico, non un dato Auxilium.
+
+def get_benefit_library(cluster: str = None) -> dict:
+    """Libreria di benefici per il calcolatore. Se `cluster` è indicato, restituisce
+    solo i benefici allineati a quel cluster (con la metodologia relativa); altrimenti
+    restituisce l'intera libreria raggruppata per cluster, per un progetto non ancora
+    associato a un'area di servizio."""
+    if cluster:
+        return get_cluster_benefits(cluster)
+    return {
+        "cluster": None,
+        "methodologyNote": (
+            "Nessun cluster selezionato per il progetto: qui sotto l'intera libreria "
+            "raggruppata per area di servizio. Seleziona un'area di servizio nel progetto "
+            "per vedere solo i benefici allineati a quel cluster."
+        ),
+        "byCluster": {c: get_cluster_benefits(c) for c in CLUSTER_BENEFITS},
+    }

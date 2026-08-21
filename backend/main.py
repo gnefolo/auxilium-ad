@@ -365,19 +365,22 @@ def post_sroi_outcome(
     payload: dict = Body(...),
     db: Session = Depends(get_db),
 ):
-    """Salva i dati di outcome inseriti manualmente per un cluster/anno (utenti in
-    carico, ore erogate, valore sociale netto già valutato altrove). Non calcola né
-    inventa un valore sociale: si limita a registrare quanto inserito."""
+    """Salva i dati di outcome inseriti manualmente per le commesse attive di un
+    cluster/anno: utenti in carico, ore erogate, e le quantità reali dei benefici
+    allineati al cluster (`benefitQuantities`, chiave = indice del beneficio nel
+    catalogo). Il valore sociale netto e il rapporto SROI si ricalcolano sempre da
+    queste quantità con la metodologia SROI Network - non vengono mai inseriti
+    come numero isolato."""
     cluster = payload.get("cluster")
     year = payload.get("year")
     if not cluster or not year:
         return {"error": "cluster e year sono obbligatori"}
 
-    outcome = save_cluster_outcome(
+    save_cluster_outcome(
         db, cluster, int(year),
         users_served=payload.get("usersServed"),
         hours_delivered=payload.get("hoursDelivered"),
-        net_social_value_eur=payload.get("netSocialValueEUR"),
+        benefit_quantities=payload.get("benefitQuantities"),
         note=payload.get("note"),
     )
     return compute_sroi_framework(db, cluster, int(year))
@@ -389,18 +392,24 @@ def get_relazione_generata(
     budget_eur: float = Query(...),
     durata_anni: float = Query(1.0),
     regione: Optional[str] = Query(None),
+    sroi_project_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
 ):
     """Fase 5: bozza di Relazione Tecnica con track record reale, stima di impatto
-    SAM (Tipo I/II) e framework SROI, per un profilo di bando ipotizzato."""
-    return generate_relazione(db, cluster, budget_eur, durata_anni, regione)
+    SAM (Tipo I/II) e benefici/metodologia SROI allineati al cluster. Se
+    `sroi_project_id` è indicato (un progetto creato in 'Calcolo SROI' per questo
+    bando), la stima SROI del progetto viene inclusa nella bozza."""
+    return generate_relazione(db, cluster, budget_eur, durata_anni, regione, sroi_project_id)
 
 
-@app.get("/api/sroi/benefit-library")
-def get_benefit_library():
-    """Libreria di beneficio di esempio (proxy NON popolate, da validare) per il
-    calcolatore SROI rigoroso."""
-    return sroi_projects.BENEFIT_LIBRARY
+@app.get("/api/sroi/benefits-catalog")
+def get_benefits_catalog(cluster: Optional[str] = Query(None)):
+    """Libreria di benefici allineata al cluster di servizio, con proxy finanziarie
+    e metodologia di monetizzazione (vedi sroi/benefits_catalog.py), per il
+    calcolatore SROI di nuovi progetti ('Calcolo SROI') e per la pagina 'SROI'
+    (commesse attive). Se `cluster` non è indicato, restituisce l'intera libreria
+    raggruppata per cluster."""
+    return sroi_projects.get_benefit_library(cluster)
 
 
 @app.get("/api/sroi/projects")
