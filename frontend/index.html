@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cruscotto Strategico AD | Auxilium</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+
+  <!-- ============ LOGIN SCREEN ============ -->
+  <div id="loginScreen" class="login-screen">
+    <div class="login-card glass">
+      <div class="brand" style="margin-bottom:24px; justify-content:center;">
+        <div class="brand-logo">
+          <svg width="34" height="34" viewBox="0 0 32 32" fill="none">
+            <rect width="32" height="32" rx="8" fill="#8DB600"/>
+            <path d="M8 22L13 10L16 18L19 13L24 22" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <div class="brand-name">Auxilium</div>
+          <div class="brand-sub">Cruscotto Strategico AD</div>
+        </div>
+      </div>
+      <form id="loginForm">
+        <div class="filter-group" style="margin-bottom:14px;">
+          <label for="loginUsername">Utente</label>
+          <input type="text" id="loginUsername" autocomplete="username" required style="width:100%; border-radius:8px;">
+        </div>
+        <div class="filter-group" style="margin-bottom:18px;">
+          <label for="loginPassword">Password</label>
+          <input type="password" id="loginPassword" autocomplete="current-password" required style="width:100%; border-radius:8px;">
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Accedi</button>
+        <p id="loginError" class="login-error"></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============ APP ============ -->
+  <div id="appRoot" style="display:none;">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo">
+        <svg width="30" height="30" viewBox="0 0 32 32" fill="none">
+          <rect width="32" height="32" rx="8" fill="#8DB600"/>
+          <path d="M8 22L13 10L16 18L19 13L24 22" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <div class="brand-name">Auxilium</div>
+        <div class="brand-sub">Cruscotto Strategico AD</div>
+      </div>
+    </div>
+    <nav class="nav-menu">
+      <a href="#" class="nav-item active" data-page="overview">
+        <span class="nav-icon">📊</span>
+        Overview
+      </a>
+      <a href="#" class="nav-item" data-page="gare">
+        <span class="nav-icon">📋</span>
+        Gare & Appalti
+      </a>
+      <a href="#" class="nav-item" data-page="footprint">
+        <span class="nav-icon">🌍</span>
+        Footprint (SAM)
+      </a>
+      <a href="#" class="nav-item" data-page="sroi">
+        <span class="nav-icon">💠</span>
+        SROI
+      </a>
+      <a href="#" class="nav-item" data-page="sroicalc">
+        <span class="nav-icon">🧮</span>
+        Calcolo SROI
+      </a>
+      <a href="#" class="nav-item" data-page="territorio">
+        <span class="nav-icon">📍</span>
+        Territorio
+      </a>
+      <a href="#" class="nav-item" data-page="anomalie">
+        <span class="nav-icon">🔔</span>
+        Anomalie
+      </a>
+      <a href="#" class="nav-item" data-page="relazione">
+        <span class="nav-icon">📄</span>
+        Genera Relazione
+      </a>
+      <a href="#" class="nav-item" data-page="settings">
+        <span class="nav-icon">⚙️</span>
+        Impostazioni
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar">AD</div>
+        <div class="user-details">
+          <div class="user-name">Amministratore Delegato</div>
+          <div class="user-role">Accesso Completo</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1 class="page-title" id="pageTitle">Executive Overview</h1>
+        <p class="page-subtitle" id="pageSubtitle">Sintesi delle performance aziendali aggiornata in tempo reale.</p>
+      </div>
+      <div class="topbar-right">
+        <div class="server-status">
+          <span class="status-dot" id="apiStatusDot"></span>
+          <span class="status-text" id="apiStatusText">Connecting...</span>
+        </div>
+        <button class="btn btn-primary" id="exportPdfBtn">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2v8M5 7l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 12h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          Esporta Report
+        </button>
+      </div>
+    </header>
+
+    <div class="content-scroll">
+
+      <!-- ============ PAGE: OVERVIEW ============ -->
+      <div class="page active" id="page-overview">
+
+        <section class="kpi-grid">
+          <div class="kpi-card" id="kpiCardRevenue">
+            <div class="kpi-header">
+              <span class="kpi-title">Valore Commesse</span>
+              <span class="kpi-icon">💶</span>
+            </div>
+            <div class="kpi-body">
+              <h2 class="kpi-value" id="valRevenue">--</h2>
+              <div class="kpi-trend trend-up" id="trendRevenue">--</div>
+            </div>
+          </div>
+          <div class="kpi-card" id="kpiCardMargin">
+            <div class="kpi-header">
+              <span class="kpi-title">Margine Operativo</span>
+              <span class="kpi-icon">📈</span>
+            </div>
+            <div class="kpi-body">
+              <h2 class="kpi-value" id="valMargin">--</h2>
+              <div class="kpi-trend trend-neutral" id="trendMargin">--</div>
+            </div>
+          </div>
+          <div class="kpi-card" id="kpiCardTenders">
+            <div class="kpi-header">
+              <span class="kpi-title">Commesse Attive</span>
+              <span class="kpi-icon">📝</span>
+            </div>
+            <div class="kpi-body">
+              <h2 class="kpi-value" id="valTenders">--</h2>
+              <div class="kpi-trend trend-neutral" id="trendTenders">--</div>
+            </div>
+          </div>
+          <div class="kpi-card" id="kpiCardCommittenti">
+            <div class="kpi-header">
+              <span class="kpi-title">Enti Committenti</span>
+              <span class="kpi-icon">🏛️</span>
+            </div>
+            <div class="kpi-body">
+              <h2 class="kpi-value" id="valWinRate">--</h2>
+              <div class="kpi-trend trend-neutral" id="trendWinRate">--</div>
+            </div>
+          </div>
+        </section>
+
+        <div class="data-grid">
+          <div class="card glass span-2">
+            <div class="card-header">
+              <h3 class="card-title">Valore Commesse per Cluster di Servizio</h3>
+            </div>
+            <div class="chart-container">
+              <canvas id="sroiChart"></canvas>
+            </div>
+          </div>
+
+          <div class="card glass">
+            <div class="card-header">
+              <h3 class="card-title">Cluster Principali</h3>
+            </div>
+            <div class="stat-list" id="topClustersList"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ PAGE: GARE & APPALTI ============ -->
+      <div class="page" id="page-gare">
+        <div class="filter-bar">
+          <div class="filter-group">
+            <label for="filterYear">Anno</label>
+            <select id="filterYear"></select>
+          </div>
+          <div class="filter-group">
+            <label for="filterCluster">Cluster di servizio</label>
+            <select id="filterCluster">
+              <option value="">Tutti</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="filterStatus">Stato</label>
+            <select id="filterStatus">
+              <option value="">Tutti</option>
+              <option value="In essere">In essere</option>
+              <option value="Concluso">Concluso</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="card glass">
+          <div class="card-header">
+            <h3 class="card-title">Storico Commesse</h3>
+            <button class="btn btn-secondary btn-sm" id="exportExcelBtn" title="Esporta in Excel">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 3h8M4 13h8M2 8h12M6 8v5M10 8v5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              Export XLSX
+            </button>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Sito</th>
+                  <th>Servizio / Ente Committente</th>
+                  <th>Valore</th>
+                  <th>Regione</th>
+                  <th>Stato</th>
+                  <th>Cluster</th>
+                </tr>
+              </thead>
+              <tbody id="gareBody">
+                <tr><td colspan="6" class="text-center">Caricamento dati...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ PAGE: FOOTPRINT (SAM) ============ -->
+      <div class="page" id="page-footprint">
+
+        <div class="filter-bar">
+          <div class="filter-group">
+            <label for="entitySelect">Entità</label>
+            <select id="entitySelect"></select>
+          </div>
+        </div>
+
+        <div class="data-grid">
+          <div class="card glass span-2">
+            <div class="card-header">
+              <h3 class="card-title">Conto Economico (bilancio)</h3>
+              <span class="badge-year" id="financeYearBadge"></span>
+            </div>
+            <div class="chart-container">
+              <canvas id="financeChart"></canvas>
+            </div>
+          </div>
+
+          <div class="card glass">
+            <div class="card-header">
+              <h3 class="card-title">Sintesi Diretta</h3>
+            </div>
+            <div class="stat-list" id="financeSummary"></div>
+          </div>
+        </div>
+
+        <div class="card glass" style="margin-top:20px;">
+          <div class="card-header">
+            <h3 class="card-title">Impatto Macroeconomico — Diretto, Indiretto, Indotto</h3>
+          </div>
+          <p class="page-subtitle" id="samMethodNote" style="margin-bottom:16px;"></p>
+          <div class="chart-container">
+            <canvas id="samChart"></canvas>
+          </div>
+        </div>
+
+        <div class="accent-grid" style="margin-top:18px;" id="samAccentGrid">
+          <div class="accent-card diretto">
+            <div class="accent-card-title">Impatto Diretto</div>
+            <div class="stat-list" id="samDirectStats"></div>
+          </div>
+          <div class="accent-card indiretto">
+            <div class="accent-card-title">Impatto Indiretto (Tipo I)</div>
+            <div class="stat-list" id="samIndirectStats"></div>
+          </div>
+          <div class="accent-card indotto">
+            <div class="accent-card-title">Impatto Indotto (Tipo II)</div>
+            <div class="stat-list" id="samInducedStats"></div>
+          </div>
+        </div>
+
+        <div class="card glass" style="margin-top:20px;">
+          <div class="card-header" id="simulatorToggle" style="cursor:pointer;">
+            <h3 class="card-title">🎛️ Simulatore di Scenario — varia una spesa/investimento ipotizzato</h3>
+            <span id="simulatorChevron">▼ Apri</span>
+          </div>
+          <div id="simulatorBody" style="display:none;">
+            <div class="filter-bar" style="border-bottom:none; padding-top:0;">
+              <div class="filter-group">
+                <label>Spesa/investimento aggiuntivo (€)</label>
+                <input type="number" id="simAmount" value="500000" step="10000">
+              </div>
+              <div class="filter-group">
+                <label>Branca di allocazione</label>
+                <select id="simBranch">
+                  <option value="V87_88">Assistenza sociale</option>
+                  <option value="V86">Servizi sanitari</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <label>&nbsp;</label>
+                <button class="btn btn-primary btn-sm" id="simRunBtn">Calcola impatto</button>
+              </div>
+            </div>
+            <div class="stat-list" id="simResults"></div>
+          </div>
+        </div>
+
+        <div class="card glass" style="margin-top:20px;">
+          <div class="card-header"><h3 class="card-title">Benchmark di Settore — NACE Q (Sanità e Assistenza Sociale)</h3></div>
+          <p class="page-subtitle" id="benchmarkNote" style="margin-bottom:16px;"></p>
+          <div class="data-grid" style="grid-template-columns: 3fr 2fr;">
+            <div class="table-container">
+              <table class="data-table">
+                <thead><tr><th>Indicatore</th><th>Auxilium</th><th>Settore Q</th><th>Δ vs settore</th></tr></thead>
+                <tbody id="benchmarkTableBody"></tbody>
+              </table>
+            </div>
+            <div class="chart-container">
+              <canvas id="benchmarkRadarChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ PAGE: SROI ============ -->
+      <div class="page" id="page-sroi">
+
+        <div class="filter-bar">
+          <div class="filter-group">
+            <label for="clusterSelect">Cluster di servizio</label>
+            <select id="clusterSelect"></select>
+          </div>
+        </div>
+
+        <div class="sroi-banner" id="sroiBanner">
+          <span class="sroi-banner-label">SROI Ratio</span>
+          <span class="sroi-banner-value">N/D</span>
+          <span class="sroi-banner-note" id="sroiBannerNote"></span>
+        </div>
+
+        <div class="data-grid" style="margin-top:20px;">
+          <div class="card glass">
+            <div class="card-header"><h3 class="card-title">Economia del Cluster</h3></div>
+            <div class="stat-list" id="sroiEconomics"></div>
+          </div>
+
+          <div class="card glass span-2">
+            <div class="card-header"><h3 class="card-title">Inserisci Dati di Outcome</h3></div>
+            <p class="outcome-form-note">
+              Questi dati non esistono in questo progetto: vivono nel sistema di monitoraggio operativo di Auxilium.
+              Inseriscili qui per calcolare automaticamente costo/utente, costo/ora erogata e il rapporto SROI.
+              Il valore sociale netto non viene stimato da questa dashboard: se lo inserisci, ne sei responsabile.
+            </p>
+            <div class="outcome-form">
+              <div class="filter-group">
+                <label for="outcomeUsers">Utenti in carico (anno)</label>
+                <input type="number" id="outcomeUsers" min="0" step="1" placeholder="es. 850">
+              </div>
+              <div class="filter-group">
+                <label for="outcomeHours">Ore erogate (anno)</label>
+                <input type="number" id="outcomeHours" min="0" step="1" placeholder="es. 120000">
+              </div>
+              <div class="filter-group">
+                <label for="outcomeValue">Valore sociale netto (€)</label>
+                <input type="number" id="outcomeValue" min="0" step="1000" placeholder="es. 35000000">
+              </div>
+            </div>
+            <div class="filter-group" style="margin-bottom:16px;">
+              <label for="outcomeNote">Nota / fonte della valutazione</label>
+              <input type="text" id="outcomeNote" style="min-width:100%;" placeholder="es. metodo, databank di proxy usata, chi ha validato il dato">
+            </div>
+            <button class="btn btn-primary" id="outcomeSaveBtn">Salva e Calcola</button>
+            <span id="outcomeSaveStatus" style="margin-left:12px; font-size:12px; color: var(--text-muted);"></span>
+          </div>
+        </div>
+
+        <div class="card glass" style="margin-top:20px;">
+          <div class="card-header"><h3 class="card-title">Catalogo KPI — Economici</h3></div>
+          <div class="table-container">
+            <table class="data-table" id="kpiEconomicTable">
+              <thead><tr><th>Indicatore</th><th>Unità</th><th>Definizione</th><th>Stato</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card glass" style="margin-top:20px;">
+          <div class="card-header"><h3 class="card-title">Catalogo KPI — Qualità e Processo</h3></div>
+          <div class="table-container">
+            <table class="data-table" id="kpiProcessTable">
+              <thead><tr><th>Indicatore</th><th>Unità</th><th>Target</th><th>Stato</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card glass" style="margin-top:20px;">
+          <div class="card-header"><h3 class="card-title">Catalogo KPI — Volume di Servizio</h3></div>
+          <div class="table-container">
+            <table class="data-table" id="kpiVolumeTable">
+              <thead><tr><th>Indicatore</th><th>Unità</th><th>Definizione</th><th>Stato</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p class="page-subtitle" id="kpiSourceNote" style="margin-top:16px;"></p>
+        </div>
+      </div>
+
+      <!-- ============ PAGE: CALCOLO SROI (rigoroso) ============ -->
+      <div class="page" id="page-sroicalc">
+        <div class="sroicalc-layout">
+          <div class="sroicalc-list glass">
+            <div class="sroicalc-list-header">
+              <h3>Progetti</h3>
+              <button class="btn btn-primary btn-sm" id="sroiNewProjectBtn">+ Nuovo</button>
+            </div>
+            <div id="sroiProjectList"></div>
+          </div>
+          <div class="sroicalc-detail" id="sroiProjectDetail">
+            <div class="sroicalc-empty">
+              Seleziona un progetto dalla lista oppure crea un nuovo progetto SROI.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ PAGE: TERRITORIO ============ -->
+      <div class="page" id="page-territorio">
+        <div class="card glass">
+          <div class="card-header"><h3 class="card-title">Mappa dei Siti</h3></div>
+          <p class="page-subtitle" id="territorioNote" style="margin-bottom:12px;"></p>
+          <div id="territorioMap" style="height:380px; border-radius:8px; overflow:hidden;"></div>
+        </div>
+
+        <div class="data-grid" style="margin-top:20px;">
+          <div class="card glass">
+            <div class="card-header"><h3 class="card-title">Top Siti per Valore Commesse</h3></div>
+            <div class="stat-list" id="territorioRankedList"></div>
+          </div>
+          <div class="card glass span-2">
+            <div class="card-header"><h3 class="card-title">Tutti i Siti</h3></div>
+            <div class="table-container">
+              <table class="data-table">
+                <thead><tr><th>Sito</th><th>Comune</th><th>Regione</th><th>Valore Commesse</th><th>Cluster</th></tr></thead>
+                <tbody id="territorioTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ PAGE: ANOMALIE ============ -->
+      <div class="page" id="page-anomalie">
+        <div class="card glass">
+          <div class="card-header"><h3 class="card-title">Rilevamento Anomalie — Deviazione dalla Media Storica</h3></div>
+          <p class="page-subtitle" id="anomalieNote"></p>
+        </div>
+        <div id="anomalieList" style="margin-top:18px;"></div>
+      </div>
+
+      <!-- ============ PAGE: GENERA RELAZIONE (Fase 5) ============ -->
+      <div class="page" id="page-relazione">
+        <div class="filter-bar">
+          <div class="filter-group">
+            <label for="relCluster">Cluster di servizio</label>
+            <select id="relCluster"></select>
+          </div>
+          <div class="filter-group">
+            <label for="relRegione">Regione (opzionale)</label>
+            <select id="relRegione">
+              <option value="">Tutte le regioni</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="relBudget">Budget bando (€)</label>
+            <input type="number" id="relBudget" value="2000000" min="0" step="10000">
+          </div>
+          <div class="filter-group">
+            <label for="relDurata">Durata (anni)</label>
+            <input type="number" id="relDurata" value="3" min="0.5" step="0.5">
+          </div>
+          <div class="filter-group">
+            <label>&nbsp;</label>
+            <button class="btn btn-primary" id="relGeneraBtn">Genera Bozza</button>
+          </div>
+        </div>
+
+        <div id="relOutput" style="display:none;">
+
+          <div class="card glass">
+            <div class="card-header">
+              <h3 class="card-title">Bozza Relazione Tecnica — <span id="relHeaderCluster"></span></h3>
+              <button class="btn btn-secondary btn-sm" id="relPrintBtn">Stampa / Esporta PDF</button>
+            </div>
+            <p class="page-subtitle" id="relHeaderSub"></p>
+          </div>
+
+          <div class="card glass" style="margin-top:20px;">
+            <div class="card-header"><h3 class="card-title">1. Track Record Auxilium</h3></div>
+            <div class="stat-list" id="relTrackStats" style="margin-bottom:20px;"></div>
+            <div class="table-container">
+              <table class="data-table">
+                <thead><tr><th>Sito</th><th>Servizio / Ente</th><th>Valore</th><th>Regione</th><th>Anno</th><th>Stato</th></tr></thead>
+                <tbody id="relTrackBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card glass" style="margin-top:20px;">
+            <div class="card-header"><h3 class="card-title">2. Stima Impatto Macroeconomico (SAM)</h3></div>
+            <p class="page-subtitle" id="relImpactHypothesis" style="margin-bottom:16px;"></p>
+            <div class="data-grid" style="grid-template-columns: 2fr 1fr;">
+              <div class="chart-container">
+                <canvas id="relSamChart"></canvas>
+              </div>
+              <div class="stat-list" id="relSamSummary"></div>
+            </div>
+          </div>
+
+          <div class="card glass" style="margin-top:20px;">
+            <div class="card-header"><h3 class="card-title">3. Framework SROI e KPI di Monitoraggio Proposti</h3></div>
+            <div class="sroi-banner">
+              <span class="sroi-banner-label">SROI Ratio</span>
+              <span class="sroi-banner-value">N/D</span>
+              <span class="sroi-banner-note" id="relSroiNote"></span>
+            </div>
+            <h4 class="kpi-catalog-title">KPI Economici</h4>
+            <div class="table-container">
+              <table class="data-table" id="relKpiEconomicTable">
+                <thead><tr><th>Indicatore</th><th>Unità</th><th>Definizione</th><th>Stato</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <h4 class="kpi-catalog-title">KPI Qualità e Processo</h4>
+            <div class="table-container">
+              <table class="data-table" id="relKpiProcessTable">
+                <thead><tr><th>Indicatore</th><th>Unità</th><th>Target</th><th>Stato</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <h4 class="kpi-catalog-title">KPI Volume di Servizio</h4>
+            <div class="table-container">
+              <table class="data-table" id="relKpiVolumeTable">
+                <thead><tr><th>Indicatore</th><th>Unità</th><th>Definizione</th><th>Stato</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card glass" style="margin-top:20px;">
+            <div class="card-header"><h3 class="card-title">4. Note Metodologiche</h3></div>
+            <p class="settings-text" id="relNoteMetodologiche"></p>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ============ PAGE: IMPOSTAZIONI ============ -->
+      <div class="page" id="page-settings">
+        <div class="card glass">
+          <div class="card-header"><h3 class="card-title">Stato del progetto</h3></div>
+          <div class="settings-text">
+            <p><strong>Fase 1 — Schema dati:</strong> allineato al README (Dim/Fact star schema), dati reali dell'Elenco Servizi caricati.</p>
+            <p><strong>Fase 2 — Bilanci:</strong> conto economico 2025 (2024 per Auxilium capogruppo) delle 4 entità della rete, letto e integrato.</p>
+            <p><strong>Fase 3 — SAM:</strong> motore di moltiplicatori Input-Output su tavole ISTAT 2022 (63 branche), Tipo I (fornitori) e Tipo II (con indotto dei consumi delle famiglie).</p>
+            <p><strong>Fase 4 — SROI:</strong> catalogo KPI standardizzato per cluster di servizio; costo/utente, costo/ora e SROI si calcolano automaticamente una volta inseriti i dati di outcome nella pagina SROI.</p>
+            <p><strong>Fase 5 — Relazione Tecnica:</strong> generatore di bozze con track record, impatto SAM e KPI proposti.</p>
+          </div>
+        </div>
+
+        <div class="card glass" style="margin-top:20px;">
+          <div class="card-header"><h3 class="card-title">Fonti dei dati</h3></div>
+          <div class="settings-text">
+            <p><strong>Elenco servizi Auxilium.pdf</strong> — storico commesse 2015-2024, trascritto a mano.</p>
+            <p><strong>Bilanci d'esercizio</strong> — Auxilium, Physioclinic S.r.l., Auxilium Care, Auxilium Servizi (2025; 2024 per Auxilium capogruppo, da Bilancio Sociale).</p>
+            <p><strong>ISTAT</strong> — Sistema di tavole Input-Output 2020-2022 (63 branche NACE Rev.2); cuneo fiscale OCSE Taxing Wages 2023; propensione al risparmio, Conti nazionali per settore istituzionale.</p>
+            <p><strong>Relazione Tecnica</strong> (gara PNRR M5C2, 23.05.2025) — base per il catalogo KPI di processo/qualità e volume di servizio.</p>
+          </div>
+        </div>
+
+        <div class="card glass" style="margin-top:20px;">
+          <div class="card-header"><h3 class="card-title">Limiti metodologici dichiarati</h3></div>
+          <div class="settings-text">
+            <p>Il modello SAM usa la tavola Input-Output <strong>nazionale</strong> italiana: la propagazione stimata non è confinata ai territori dove opera Auxilium (Basilicata/Puglia/Lazio).</p>
+            <p>L'allocazione della spesa tra branche fornitrici usa il mix di acquisti <strong>medio della branca</strong> "Assistenza sociale", non i fornitori reali di Auxilium.</p>
+            <p>Cuneo fiscale e propensione al risparmio sono medie nazionali usate come proxy delle propensioni marginali.</p>
+            <p>Il valore sociale netto per il calcolo SROI va inserito manualmente nella pagina SROI: la dashboard non lo stima né lo inventa.</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  </div><!-- /#appRoot -->
+
+  <script src="app.js"></script>
+</body>
+</html>

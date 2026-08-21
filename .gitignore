@@ -1,0 +1,12 @@
+# Database locale (rigenerato automaticamente da init_db()/seed_data.py all'avvio)
+backend/auxilium.db
+auxilium.db
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS
+.DS_Store
