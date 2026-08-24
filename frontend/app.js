@@ -120,6 +120,26 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ------------------------------------------------------------------
+  // Glossario: icona (i) con spiegazione dei termini tecnici al passaggio
+  // del mouse/focus (SROI, BCR, VAN Sociale, deadweight, attribution, drop-off).
+  // ------------------------------------------------------------------
+  const GLOSSARY = {
+    sroi: "SROI (Social Return On Investment): rapporto tra il valore sociale netto generato e l'investimento. Es. 2,0x = 2€ di valore sociale per ogni €1 investito.",
+    bcr: 'BCR (Benefit-Cost Ratio): in questa metodologia coincide con il rapporto SROI (valore netto dei benefici diviso il costo totale) - non è un numero diverso, è lo stesso rapporto con un altro nome comune in letteratura.',
+    van: "VAN Sociale (valore attuale netto): valore netto dei benefici meno l'investimento, in euro. A differenza dello SROI (un rapporto), esprime la grandezza assoluta del valore creato o distrutto.",
+    deadweight: 'Deadweight: quota del risultato che si sarebbe verificata comunque, anche senza questo intervento/progetto.',
+    attribution: 'Attribution: quota del risultato attribuibile a questo intervento, escludendo il contributo di altri attori o fattori esterni.',
+    dropoff: 'Drop-off: riduzione annua del beneficio negli anni successivi al primo - il beneficio tende a scemare nel tempo.',
+    qualitaIndicatori: 'Percentuale di indicatori del catalogo standardizzato per cui esistono oggi dati reali calcolabili, rispetto al totale del catalogo.',
+  };
+
+  function infoIcon(term) {
+    const text = GLOSSARY[term];
+    if (!text) return '';
+    return `<span class="info-icon" tabindex="0">i<span class="tooltip-box">${text}</span></span>`;
+  }
+
+  // ------------------------------------------------------------------
   // Navigazione tra pagine
   // ------------------------------------------------------------------
   function showPage(pageKey) {
@@ -690,11 +710,40 @@ document.addEventListener('DOMContentLoaded', () => {
     ), 0);
   }
 
+  const PAI_STEP_ICONS = { valutazione_iniziale: '🧭', pianificazione: '📋', erogazione: '🤝', verifica: '✅' };
+
+  function renderPaiPipeline(kpiCatalog) {
+    const box = document.getElementById('paiPipeline');
+    const faseOrder = kpiCatalog.faseOrder || [];
+    const faseLabels = kpiCatalog.faseLabels || {};
+    const allKpis = [...kpiCatalog.processQualityKPIs, ...kpiCatalog.serviceVolumeKPIs];
+
+    const steps = faseOrder.map(fase => {
+      const kpis = allKpis.filter(k => k.fase === fase);
+      const computable = kpis.filter(k => k.status === 'calcolabile_oggi').length;
+      return { fase, label: faseLabels[fase] || fase, computable, total: kpis.length };
+    });
+
+    box.innerHTML = steps.map(s => `
+      <div class="pai-step">
+        <div class="pai-step-icon">${PAI_STEP_ICONS[s.fase] || '•'}</div>
+        <div class="pai-step-label">${escapeHtml(s.label)}</div>
+        <div class="pai-step-count">${s.computable}/${s.total} calcolabili</div>
+      </div>
+    `).join('') + `
+      <div class="pai-step pai-step-outcome">
+        <div class="pai-step-icon">📈</div>
+        <div class="pai-step-label">Outcome (SROI)</div>
+        <div class="pai-step-count">vedi benefici sotto</div>
+      </div>
+    `;
+  }
+
   function renderIndicatorQuality(q) {
     const box = document.getElementById('indicatorQualityBar');
     box.innerHTML = `
       <div class="quality-meter">
-        <div class="quality-meter-label">Qualità catalogo KPI</div>
+        <div class="quality-meter-label">Qualità catalogo KPI${infoIcon('qualitaIndicatori')}</div>
         <div class="quality-meter-track"><div class="quality-meter-fill" style="width:${q.kpiCatalogPct}%"></div></div>
         <div class="quality-meter-value">${q.kpiCatalogComputable}/${q.kpiCatalogTotal} calcolabili oggi (${q.kpiCatalogPct.toFixed(0)}%)</div>
       </div>
@@ -715,6 +764,7 @@ document.addEventListener('DOMContentLoaded', () => {
     banner.querySelector('.sroi-banner-value').textContent = calculated ? `${data.sroiRatio.toFixed(4)}x` : 'N/D';
     document.getElementById('sroiBannerNote').textContent = data.sroiStatus || '';
 
+    renderPaiPipeline(data.kpiCatalog);
     renderIndicatorQuality(data.indicatorQuality);
 
     const e = data.economics;
@@ -968,9 +1018,9 @@ document.addEventListener('DOMContentLoaded', () => {
           <div><label>Quantità</label><input type="number" class="bf" data-field="quantity" value="${b.quantity}"></div>
           <div><label>Proxy (€/unità)</label><input type="number" class="bf" data-field="proxyValueEUR" value="${b.proxyValueEUR}"></div>
           <div><label>Anni durata</label><input type="number" class="bf" data-field="durationYears" value="${b.durationYears}" min="1" step="1"></div>
-          <div><label>Deadweight %</label><input type="number" class="bf" data-field="deadweightPct" value="${b.deadweightPct}" min="0" max="100"></div>
-          <div><label>Attribution %</label><input type="number" class="bf" data-field="attributionPct" value="${b.attributionPct}" min="0" max="100"></div>
-          <div><label>Drop-off % /anno</label><input type="number" class="bf" data-field="dropoffPct" value="${b.dropoffPct}" min="0" max="100"></div>
+          <div><label>Deadweight %${infoIcon('deadweight')}</label><input type="number" class="bf" data-field="deadweightPct" value="${b.deadweightPct}" min="0" max="100"></div>
+          <div><label>Attribution %${infoIcon('attribution')}</label><input type="number" class="bf" data-field="attributionPct" value="${b.attributionPct}" min="0" max="100"></div>
+          <div><label>Drop-off % /anno${infoIcon('dropoff')}</label><input type="number" class="bf" data-field="dropoffPct" value="${b.dropoffPct}" min="0" max="100"></div>
         </div>
       </div>
     `;
@@ -987,8 +1037,8 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="sroicalc-detail-header">
         <h2>${escapeHtml(data.name)}</h2>
         <div style="display:flex; align-items:center; gap:14px;">
-          <span class="stat-label">SROI/BCR: <strong id="sroiHeaderRatio" style="color:var(--green-d); font-size:15px;">${sroiDisplay}</strong></span>
-          <span class="stat-label">VAN Sociale: <strong id="sroiHeaderVan" style="font-size:15px;">${vanDisplay}</strong></span>
+          <span class="stat-label">SROI/BCR${infoIcon('bcr')}: <strong id="sroiHeaderRatio" style="color:var(--green-d); font-size:15px; font-family:var(--font-mono);">${sroiDisplay}</strong></span>
+          <span class="stat-label">VAN Sociale${infoIcon('van')}: <strong id="sroiHeaderVan" style="font-size:15px; font-family:var(--font-mono);">${vanDisplay}</strong></span>
           <button class="btn btn-secondary btn-sm" id="sroiDeleteProjectBtn">Elimina</button>
           <button class="btn btn-primary btn-sm" id="sroiSaveProjectBtn">Salva</button>
         </div>

@@ -33,7 +33,7 @@
   /* Un'unica famiglia sans, coerente con lo stile di riferimento (niente serif/mono decorativi) */
   --font-sans: 'Inter', -apple-system, 'Open Sans', sans-serif;
   --font-serif: var(--font-sans);
-  --font-mono: var(--font-sans);
+  --font-mono: 'JetBrains Mono', 'SFMono-Regular', Menlo, Consolas, monospace;
 
   --transition: all 0.15s ease;
 
@@ -407,6 +407,7 @@ body {
   font-weight: 700;
   color: var(--text-main);
   letter-spacing: -0.3px;
+  font-family: var(--font-mono);
 }
 
 .kpi-trend {
@@ -677,6 +678,7 @@ body {
   font-size: 20px;
   font-weight: 700;
   color: var(--text-main);
+  font-family: var(--font-mono);
 }
 
 .sroi-banner-note {
@@ -698,6 +700,41 @@ body {
 
 .status-badge.kpi-ok { background: var(--green-l); color: var(--green-d); }
 .status-badge.kpi-pending { background: var(--n-100); color: var(--text-muted); }
+
+/* Pipeline di presa in carico (SROI): valutazione -> pianificazione -> erogazione
+   -> verifica -> outcome, con conteggio KPI calcolabili/totali per fase. */
+.pai-pipeline {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  margin-top: 16px;
+  overflow-x: auto;
+}
+.pai-step {
+  flex: 1;
+  min-width: 140px;
+  background: var(--white);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 12px 14px;
+  text-align: center;
+  position: relative;
+}
+.pai-step + .pai-step { margin-left: 22px; }
+.pai-step + .pai-step::before {
+  content: '→';
+  position: absolute;
+  left: -20px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--n-400);
+  font-size: 14px;
+}
+.pai-step-icon { font-size: 18px; margin-bottom: 6px; }
+.pai-step-label { font-size: 11px; font-weight: 700; color: var(--text-main); margin-bottom: 4px; }
+.pai-step-count { font-size: 10.5px; color: var(--text-muted); font-family: var(--font-mono); }
+.pai-step.pai-step-outcome { background: var(--green-l); border-color: var(--green); }
+.pai-step.pai-step-outcome .pai-step-label { color: var(--green-d); }
 
 /* Qualità degli indicatori (SROI) */
 .quality-bar-row {
@@ -816,9 +853,9 @@ body {
 .project-card-name { font-size: 13px; font-weight: 700; color: var(--text-main); }
 .project-card-meta { font-size: 11px; color: var(--text-muted); margin-bottom: 6px; }
 .project-card-sroi { font-size: 12px; color: var(--text-muted); }
-.project-card-sroi span { color: var(--green-d); font-weight: 700; }
+.project-card-sroi span { color: var(--green-d); font-weight: 700; font-family: var(--font-mono); }
 .project-card-van { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
-.project-card-van span { color: var(--text-main); font-weight: 600; }
+.project-card-van span { color: var(--text-main); font-weight: 600; font-family: var(--font-mono); }
 
 .sroicalc-detail {
   flex: 1;
@@ -887,6 +924,7 @@ body {
   font-size: 13px;
   font-weight: 700;
 }
+.total-row span:last-child { font-family: var(--font-mono); }
 
 .benefit-card {
   border: 1px solid var(--border-color);
@@ -928,7 +966,7 @@ body {
   text-align: right;
   flex-shrink: 0;
 }
-.benefit-net-value .value { font-size: 15px; font-weight: 700; color: var(--green-d); }
+.benefit-net-value .value { font-size: 15px; font-weight: 700; color: var(--green-d); font-family: var(--font-mono); }
 .benefit-net-value .label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
 
 /* Simulazione di scenario (Calcolo SROI) */
@@ -959,8 +997,62 @@ body {
   margin-bottom: 8px;
 }
 .scenario-mult { font-size: 10.5px; font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--text-muted); }
-.scenario-sroi { font-size: 20px; font-weight: 700; color: var(--green-d); }
-.scenario-van { font-size: 11.5px; color: var(--text-muted); margin-top: 4px; }
+.scenario-sroi { font-size: 20px; font-weight: 700; color: var(--green-d); font-family: var(--font-mono); }
+.scenario-van { font-size: 11.5px; color: var(--text-muted); margin-top: 4px; font-family: var(--font-mono); }
+
+/* Glossario: icona (i) con spiegazione al passaggio del mouse/focus per i termini
+   tecnici (SROI, BCR, VAN Sociale, deadweight, attribution, drop-off, ecc.) */
+.info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  margin-left: 4px;
+  border-radius: 50%;
+  background: var(--n-200);
+  color: var(--n-600);
+  font-size: 9.5px;
+  font-weight: 700;
+  font-style: normal;
+  font-family: var(--font-sans);
+  text-transform: none;
+  letter-spacing: normal;
+  cursor: help;
+  position: relative;
+  vertical-align: middle;
+}
+.info-icon:hover, .info-icon:focus { background: var(--green); color: white; outline: none; }
+.info-icon .tooltip-box {
+  display: none;
+  position: absolute;
+  z-index: 30;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 240px;
+  background: var(--n-800);
+  color: var(--white);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.5;
+  text-transform: none;
+  letter-spacing: normal;
+  padding: 9px 12px;
+  border-radius: 8px;
+  box-shadow: var(--shadow-floating);
+  cursor: default;
+}
+.info-icon .tooltip-box::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--n-800);
+}
+.info-icon:hover .tooltip-box, .info-icon:focus .tooltip-box { display: block; }
 
 .benefit-fields {
   display: grid;

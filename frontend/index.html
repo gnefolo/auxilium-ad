@@ -7,7 +7,7 @@
   <link rel="icon" type="image/png" href="logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -346,10 +346,12 @@
         </div>
 
         <div class="sroi-banner" id="sroiBanner">
-          <span class="sroi-banner-label">SROI Ratio — commesse attive</span>
+          <span class="sroi-banner-label">SROI Ratio — commesse attive<span class="info-icon" tabindex="0">i<span class="tooltip-box">SROI (Social Return On Investment): rapporto tra il valore sociale netto generato e l'investimento. Es. 2,0x = 2€ di valore sociale per ogni €1 investito.</span></span></span>
           <span class="sroi-banner-value">N/D</span>
           <span class="sroi-banner-note" id="sroiBannerNote"></span>
         </div>
+
+        <div class="pai-pipeline" id="paiPipeline"></div>
 
         <div class="quality-bar-row" id="indicatorQualityBar"></div>
 
@@ -577,7 +579,7 @@
           <div class="card glass" style="margin-top:20px;">
             <div class="card-header"><h3 class="card-title">3. SROI, Benefici del Cluster e KPI di Monitoraggio Proposti</h3></div>
             <div class="sroi-banner" id="relSroiBanner">
-              <span class="sroi-banner-label">SROI Ratio progetto</span>
+              <span class="sroi-banner-label">SROI Ratio progetto<span class="info-icon" tabindex="0">i<span class="tooltip-box">SROI (Social Return On Investment): rapporto tra il valore sociale netto generato e l'investimento. Es. 2,0x = 2€ di valore sociale per ogni €1 investito.</span></span></span>
               <span class="sroi-banner-value">N/D</span>
               <span class="sroi-banner-note" id="relSroiNote"></span>
             </div>
