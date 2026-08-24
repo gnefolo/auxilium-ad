@@ -28,14 +28,6 @@ app = FastAPI(title="Auxilium Cruscotto Strategico API")
 # Initialize SQLite database
 init_db()
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # Percorsi accessibili senza token (login stesso + endpoint di servizio/documentazione).
 PUBLIC_PATHS = {"/", "/api/auth/login", "/docs", "/openapi.json", "/redoc"}
 
@@ -50,6 +42,20 @@ async def require_auth(request: Request, call_next):
     if not token or not verify_token(token):
         return JSONResponse(status_code=401, content={"error": "Non autenticato"})
     return await call_next(request)
+
+
+# IMPORTANTE: registrato DOPO require_auth così risulta il middleware più esterno
+# (in Starlette l'ultimo aggiunto avvolge tutti i precedenti) e aggiunge gli header
+# CORS anche alle risposte 401 di require_auth - altrimenti un token scaduto/mancante
+# produce una risposta senza header CORS, che il browser blocca segnalando un errore
+# di CORS invece del 401 che il frontend saprebbe gestire (redirect al login).
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.post("/api/auth/login")
