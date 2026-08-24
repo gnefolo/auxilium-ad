@@ -21,6 +21,7 @@ from relazione.generator import generate_relazione
 from territorio.map_data import get_sites_map_data
 from territorio.anomalie import detect_revenue_anomalies
 from auth import create_token, verify_token, check_credentials
+import settings as app_settings
 
 app = FastAPI(title="Auxilium Cruscotto Strategico API")
 
@@ -480,8 +481,22 @@ def get_territorio_mappa(year: Optional[int] = Query(None), db: Session = Depend
 @app.get("/api/territorio/anomalie")
 def get_territorio_anomalie(db: Session = Depends(get_db)):
     """Rilevamento anomalie su deviazioni reali dei ricavi delle commesse rispetto
-    alla media storica (non un'analisi di outcome/valore sociale)."""
-    return detect_revenue_anomalies(db)
+    alla media storica (non un'analisi di outcome/valore sociale). Le soglie sono
+    configurabili nella pagina Impostazioni (vedi /api/settings)."""
+    s = app_settings.get_settings(db)
+    return detect_revenue_anomalies(db, s["anomalia_soglia_attenzione"], s["anomalia_soglia_critico"])
+
+
+@app.get("/api/settings")
+def get_app_settings(db: Session = Depends(get_db)):
+    """Preferenze del cruscotto (soglie di anomalia, intervallo di auto-refresh)."""
+    return app_settings.get_settings(db)
+
+
+@app.put("/api/settings")
+def put_app_settings(payload: dict = Body(...), db: Session = Depends(get_db)):
+    """Salva le preferenze del cruscotto."""
+    return app_settings.save_settings(db, payload)
 
 
 if __name__ == "__main__":

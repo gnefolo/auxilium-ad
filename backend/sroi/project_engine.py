@@ -46,6 +46,7 @@ def _project_dict(p: SroiProject) -> dict:
         "year": p.Year,
         "directBeneficiaries": p.DirectBeneficiaries,
         "description": p.Description,
+        "purpose": p.Purpose,
     }
 
 
@@ -86,7 +87,10 @@ def list_projects(db: Session) -> list:
             for b in benefits
         )
         row = _project_dict(p)
+        row["totalInvestmentEUR"] = total_investment
+        row["totalNetValueEUR"] = total_net_value
         row["sroiRatio"] = (total_net_value / total_investment) if total_investment else None
+        row["vanSocialeEUR"] = total_net_value - total_investment
         result.append(row)
     return result
 
@@ -108,6 +112,7 @@ def get_project(db: Session, project_id: int) -> dict:
     result["benefits"] = benefit_rows
     result["totalNetValueEUR"] = total_net_value
     result["sroiRatio"] = (total_net_value / total_investment) if total_investment else None
+    result["vanSocialeEUR"] = total_net_value - total_investment
     return result
 
 
@@ -119,6 +124,7 @@ def create_project(db: Session, payload: dict) -> dict:
         Year=payload.get("year"),
         DirectBeneficiaries=payload.get("directBeneficiaries"),
         Description=payload.get("description"),
+        Purpose=payload.get("purpose"),
     )
     db.add(p)
     db.commit()
@@ -131,7 +137,7 @@ def update_project(db: Session, project_id: int, payload: dict) -> dict:
         return None
     for field, attr in [("name", "Name"), ("serviceCluster", "ServiceCluster"), ("status", "Status"),
                          ("year", "Year"), ("directBeneficiaries", "DirectBeneficiaries"),
-                         ("description", "Description")]:
+                         ("description", "Description"), ("purpose", "Purpose")]:
         if field in payload:
             setattr(p, attr, payload[field])
     db.commit()

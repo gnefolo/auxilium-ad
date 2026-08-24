@@ -195,15 +195,19 @@
               <option value="">Tutti</option>
             </select>
           </div>
-          <div class="filter-group">
-            <label for="filterStatus">Stato</label>
-            <select id="filterStatus">
-              <option value="">Tutti</option>
-              <option value="In essere">In essere</option>
-              <option value="Concluso">Concluso</option>
-            </select>
+          <div class="filter-group" style="flex:1; min-width:220px;">
+            <label for="gareSearch">Cerca (servizio, ente, sito)</label>
+            <input type="text" id="gareSearch" placeholder="es. Roma, ADI, Comune di...">
           </div>
         </div>
+
+        <div class="pill-filter-row" id="gareStatusPills">
+          <button class="pill-filter active" data-status="">Tutte</button>
+          <button class="pill-filter" data-status="In essere">In essere</button>
+          <button class="pill-filter" data-status="Concluso">Concluse</button>
+        </div>
+
+        <section class="kpi-grid" id="gareSummaryStrip" style="margin: 0 0 20px;"></section>
 
         <div class="card glass">
           <div class="card-header">
@@ -435,7 +439,12 @@
 
       <!-- ============ PAGE: CALCOLO SROI (rigoroso) ============ -->
       <div class="page" id="page-sroicalc">
-        <div class="sroicalc-layout">
+        <div class="pill-filter-row" id="sroiCalcViewTabs">
+          <button class="pill-filter active" data-view="progetti">Progetti</button>
+          <button class="pill-filter" data-view="portafoglio">Confronto portafoglio</button>
+        </div>
+
+        <div class="sroicalc-layout" id="sroiCalcProjectsView">
           <div class="sroicalc-list glass">
             <div class="sroicalc-list-header">
               <h3>Progetti</h3>
@@ -446,6 +455,21 @@
           <div class="sroicalc-detail" id="sroiProjectDetail">
             <div class="sroicalc-empty">
               Seleziona un progetto dalla lista oppure crea un nuovo progetto SROI.
+            </div>
+          </div>
+        </div>
+
+        <div id="sroiCalcPortfolioView" style="display:none;">
+          <section class="kpi-grid" id="sroiPortfolioStrip" style="margin-bottom:20px;"></section>
+          <div class="card glass">
+            <div class="card-header"><h3 class="card-title">Tutti i progetti</h3></div>
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr><th>Progetto</th><th>Cluster</th><th>Anno</th><th>Stato</th><th>Investimento</th><th>Valore netto</th><th>SROI</th></tr>
+                </thead>
+                <tbody id="sroiPortfolioTableBody"></tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -603,13 +627,44 @@
       <!-- ============ PAGE: IMPOSTAZIONI ============ -->
       <div class="page" id="page-settings">
         <div class="card glass">
+          <div class="card-header"><h3 class="card-title">Preferenze cruscotto</h3></div>
+          <p class="page-subtitle" style="margin-bottom:16px;">
+            Soglie e comportamenti applicati a calcoli che restano sempre su dati reali — non introducono dati aziendali.
+          </p>
+          <div class="form-grid">
+            <div class="filter-group">
+              <label for="setRefreshInterval">Aggiornamento automatico Overview</label>
+              <select id="setRefreshInterval">
+                <option value="15">Ogni 15 secondi</option>
+                <option value="30">Ogni 30 secondi</option>
+                <option value="60">Ogni 60 secondi</option>
+                <option value="0">Disattivato</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label for="setSogliaAttenzione">Soglia anomalia "Attenzione" (%)</label>
+              <input type="number" id="setSogliaAttenzione" min="1" max="100" step="1">
+            </div>
+            <div class="filter-group">
+              <label for="setSogliaCritico">Soglia anomalia "Critico" (%)</label>
+              <input type="number" id="setSogliaCritico" min="1" max="100" step="1">
+            </div>
+          </div>
+          <button class="btn btn-primary" id="setSaveBtn" style="margin-top:4px;">Salva preferenze</button>
+          <span id="setSaveStatus" style="margin-left:12px; font-size:12px; color: var(--text-muted);"></span>
+          <p class="page-subtitle" style="margin-top:12px;">
+            Le soglie di anomalia determinano quando una commessa (pagina Anomalie) è segnalata "Attenzione" o "Critico" in base allo scostamento reale rispetto alla media storica dei ricavi — non aggiungono dati, cambiano solo la sensibilità del rilevamento.
+          </p>
+        </div>
+
+        <div class="card glass" style="margin-top:20px;">
           <div class="card-header"><h3 class="card-title">Stato del progetto</h3></div>
           <div class="settings-text">
             <p><strong>Fase 1 — Schema dati:</strong> allineato al README (Dim/Fact star schema), dati reali dell'Elenco Servizi caricati.</p>
             <p><strong>Fase 2 — Bilanci:</strong> conto economico 2025 (2024 per Auxilium capogruppo) delle 4 entità della rete, letto e integrato.</p>
             <p><strong>Fase 3 — SAM:</strong> motore di moltiplicatori Input-Output su tavole ISTAT 2022 (63 branche), Tipo I (fornitori) e Tipo II (con indotto dei consumi delle famiglie).</p>
-            <p><strong>Fase 4 — SROI:</strong> catalogo KPI standardizzato per cluster di servizio; costo/utente, costo/ora e SROI si calcolano automaticamente una volta inseriti i dati di outcome nella pagina SROI.</p>
-            <p><strong>Fase 5 — Relazione Tecnica:</strong> generatore di bozze con track record, impatto SAM e KPI proposti.</p>
+            <p><strong>Fase 4 — SROI:</strong> benefici monetizzati allineati per cluster di servizio (metodologia SROI Network); SROI delle commesse attive e calcolatore per nuovi progetti/bandi.</p>
+            <p><strong>Fase 5 — Relazione Tecnica:</strong> generatore di bozze con track record, impatto SAM, benefici SROI del cluster ed eventuale progetto collegato.</p>
           </div>
         </div>
 
@@ -629,7 +684,7 @@
             <p>Il modello SAM usa la tavola Input-Output <strong>nazionale</strong> italiana: la propagazione stimata non è confinata ai territori dove opera Auxilium (Basilicata/Puglia/Lazio).</p>
             <p>L'allocazione della spesa tra branche fornitrici usa il mix di acquisti <strong>medio della branca</strong> "Assistenza sociale", non i fornitori reali di Auxilium.</p>
             <p>Cuneo fiscale e propensione al risparmio sono medie nazionali usate come proxy delle propensioni marginali.</p>
-            <p>Il valore sociale netto per il calcolo SROI va inserito manualmente nella pagina SROI: la dashboard non lo stima né lo inventa.</p>
+            <p>Le proxy finanziarie dei benefici SROI (pagine SROI e Calcolo SROI) sono una metodologia di partenza per cluster, con fonte e livello di confidenza dichiarati: le quantità vanno sempre inserite con dati reali.</p>
           </div>
         </div>
       </div>

@@ -11,25 +11,26 @@ from sqlalchemy.orm import Session
 
 from database import DimDate, DimSite, DimService, FactServiceRevenue
 
+# Default: sovrascrivibili per richiesta dalla pagina Impostazioni (vedi settings.py).
 SOGLIA_ATTENZIONE = 0.20   # 20%
 SOGLIA_CRITICO = 0.45      # 45%
 
 
-def _severity(deviation_pct: float) -> str:
-    if abs(deviation_pct) >= SOGLIA_CRITICO:
+def _severity(deviation_pct: float, soglia_attenzione: float, soglia_critico: float) -> str:
+    if abs(deviation_pct) >= soglia_critico:
         return "CRITICO"
-    if abs(deviation_pct) >= SOGLIA_ATTENZIONE:
+    if abs(deviation_pct) >= soglia_attenzione:
         return "ATTENZIONE"
     return "OK"
 
 
-def _suggested_actions(deviation_pct: float) -> list:
-    if deviation_pct <= -SOGLIA_ATTENZIONE:
+def _suggested_actions(deviation_pct: float, soglia_attenzione: float) -> list:
+    if deviation_pct <= -soglia_attenzione:
         return [
             "Verificare se la commessa è stata rinegoziata, ridotta o è in fase di chiusura.",
             "Controllare se manca una fattura/rendicontazione dell'ultimo anno (possibile errore di trascrizione).",
         ]
-    if deviation_pct >= SOGLIA_ATTENZIONE:
+    if deviation_pct >= soglia_attenzione:
         return [
             "Verificare se l'aumento deriva da un ampliamento del servizio o da un nuovo affidamento aggiuntivo.",
             "Controllare che l'importo non includa arretrati di anni precedenti contabilizzati nell'ultimo anno.",
@@ -37,7 +38,9 @@ def _suggested_actions(deviation_pct: float) -> list:
     return []
 
 
-def detect_revenue_anomalies(db: Session) -> dict:
+def detect_revenue_anomalies(db: Session, soglia_attenzione: float = None, soglia_critico: float = None) -> dict:
+    soglia_attenzione = SOGLIA_ATTENZIONE if soglia_attenzione is None else soglia_attenzione
+    soglia_critico = SOGLIA_CRITICO if soglia_critico is None else soglia_critico
     rows = (
         db.query(
             FactServiceRevenue.SiteKey, FactServiceRevenue.ServiceKey,
@@ -66,7 +69,7 @@ def detect_revenue_anomalies(db: Session) -> dict:
         if avg_history == 0:
             continue
         deviation_pct = (last.RevenueEUR - avg_history) / avg_history
-        severity = _severity(deviation_pct)
+        severity = _severity(deviation_pct, soglia_attenzione, soglia_critico)
         if severity == "OK":
             continue
 
@@ -82,13 +85,13 @@ def detect_revenue_anomalies(db: Session) -> dict:
             "deviationPct": deviation_pct,
             "severity": severity,
             "status": last.ContractStatus,
-            "suggestedActions": _suggested_actions(deviation_pct),
+            "suggestedActions": _suggested_actions(deviation_pct, soglia_attenzione),
         })
 
     anomalies.sort(key=lambda a: -abs(a["deviationPct"]))
     return {
         "anomalies": anomalies,
-        "thresholds": {"attenzione": SOGLIA_ATTENZIONE, "critico": SOGLIA_CRITICO},
+        "thresholds": {"attenzione": soglia_attenzione, "critico": soglia_critico},
         "sourceNote": (
             "Analisi statistica su dati REALI (FactServiceRevenue, Elenco Servizi): confronta "
             "l'ultimo anno di ciascuna commessa con la media degli anni precedenti. Non misura "

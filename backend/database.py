@@ -194,6 +194,7 @@ class SroiProject(Base):
     Year = Column(Integer)
     DirectBeneficiaries = Column(Integer, nullable=True)
     Description = Column(String, nullable=True)
+    Purpose = Column(String, nullable=True)
 
 
 class SroiProjectCost(Base):
@@ -224,6 +225,16 @@ class SroiBenefit(Base):
     AttributionPct = Column(Float, default=100.0)
     DropoffPct = Column(Float, default=0.0)
     Note = Column(String, nullable=True)
+
+
+class AppSetting(Base):
+    """Preferenze del cruscotto configurabili dall'utente (chiave/valore), es. soglie di
+    anomalia e intervallo di auto-refresh - non dati aziendali, solo impostazioni UI/soglie
+    applicate a calcoli che restano su dati reali."""
+    __tablename__ = "app_setting"
+
+    Key = Column(String, primary_key=True)
+    Value = Column(String)
 
 
 def init_db():

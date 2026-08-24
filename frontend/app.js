@@ -140,6 +140,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (pageKey === 'sroicalc') loadSroiCalcPage();
     if (pageKey === 'territorio') loadTerritorioPage();
     if (pageKey === 'anomalie') loadAnomaliePage();
+    if (pageKey === 'settings') loadSettingsPage();
   }
 
   document.querySelectorAll('.nav-item').forEach(item => {
@@ -281,10 +282,13 @@ document.addEventListener('DOMContentLoaded', () => {
   // ------------------------------------------------------------------
   // PAGE: Gare & Appalti
   // ------------------------------------------------------------------
+  let gareStatusFilter = '';
+
   async function loadGarePage() {
     const yearSelect = document.getElementById('filterYear');
     const clusterSelect = document.getElementById('filterCluster');
-    const statusSelect = document.getElementById('filterStatus');
+    const searchInput = document.getElementById('gareSearch');
+    const pillsBox = document.getElementById('gareStatusPills');
 
     if (!allServiceRevenueRows) {
       const res = await apiFetch(`${API_BASE}/service-revenue`);
@@ -300,23 +304,66 @@ document.addEventListener('DOMContentLoaded', () => {
       clusterSelect.innerHTML = '<option value="">Tutti</option>' +
         clusters.map(c => `<option value="${c}">${c}</option>`).join('');
 
-      [yearSelect, clusterSelect, statusSelect].forEach(sel => sel.addEventListener('change', renderGareTable));
+      [yearSelect, clusterSelect].forEach(sel => sel.addEventListener('change', renderGareTable));
+      searchInput.addEventListener('input', renderGareTable);
+
+      pillsBox.querySelectorAll('.pill-filter').forEach(btn => {
+        btn.addEventListener('click', () => {
+          gareStatusFilter = btn.dataset.status;
+          pillsBox.querySelectorAll('.pill-filter').forEach(b => b.classList.toggle('active', b === btn));
+          renderGareTable();
+        });
+      });
     }
     renderGareTable();
+  }
+
+  function renderGareSummary(rows) {
+    const totalValue = rows.reduce((sum, r) => sum + (r.revenueEUR || 0), 0);
+    const nActive = rows.filter(r => r.status === 'In essere').length;
+    const nCommittenti = new Set(rows.map(r => r.enteCommittente).filter(Boolean)).size;
+    const nRegioni = new Set(rows.map(r => r.regione).filter(Boolean)).size;
+
+    document.getElementById('gareSummaryStrip').innerHTML = `
+      <div class="kpi-card">
+        <div class="kpi-header"><span class="kpi-title">Commesse (filtro)</span><span class="kpi-icon">📋</span></div>
+        <div class="kpi-body"><h2 class="kpi-value">${rows.length}</h2></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-header"><span class="kpi-title">Valore totale</span><span class="kpi-icon">💶</span></div>
+        <div class="kpi-body"><h2 class="kpi-value">${formatEUR(totalValue)}</h2></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-header"><span class="kpi-title">In essere</span><span class="kpi-icon">✅</span></div>
+        <div class="kpi-body"><h2 class="kpi-value">${nActive}</h2></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-header"><span class="kpi-title">Enti / Regioni</span><span class="kpi-icon">🏛️</span></div>
+        <div class="kpi-body"><h2 class="kpi-value">${nCommittenti} / ${nRegioni}</h2></div>
+      </div>
+    `;
   }
 
   function renderGareTable() {
     const year = document.getElementById('filterYear').value;
     const cluster = document.getElementById('filterCluster').value;
-    const status = document.getElementById('filterStatus').value;
+    const search = document.getElementById('gareSearch').value.trim().toLowerCase();
 
     let rows = allServiceRevenueRows || [];
     if (year) rows = rows.filter(r => String(r.year) === String(year));
     if (cluster) rows = rows.filter(r => r.cluster === cluster);
-    if (status) rows = rows.filter(r => r.status === status);
+    if (gareStatusFilter) rows = rows.filter(r => r.status === gareStatusFilter);
+    if (search) {
+      rows = rows.filter(r =>
+        (r.contractName || '').toLowerCase().includes(search) ||
+        (r.enteCommittente || '').toLowerCase().includes(search) ||
+        (r.site || '').toLowerCase().includes(search)
+      );
+    }
     rows = [...rows].sort((a, b) => b.revenueEUR - a.revenueEUR);
 
     currentServiceRevenueData = rows;
+    renderGareSummary(rows);
 
     const tbody = document.getElementById('gareBody');
     tbody.innerHTML = '';
@@ -762,6 +809,65 @@ document.addEventListener('DOMContentLoaded', () => {
     await ensureServices();
     await refreshSroiProjectList();
     document.getElementById('sroiNewProjectBtn').onclick = createNewSroiProject;
+
+    const tabs = document.getElementById('sroiCalcViewTabs');
+    if (!tabs.dataset.wired) {
+      tabs.dataset.wired = '1';
+      tabs.querySelectorAll('.pill-filter').forEach(btn => {
+        btn.addEventListener('click', () => {
+          tabs.querySelectorAll('.pill-filter').forEach(b => b.classList.toggle('active', b === btn));
+          const isPortfolio = btn.dataset.view === 'portafoglio';
+          document.getElementById('sroiCalcProjectsView').style.display = isPortfolio ? 'none' : 'flex';
+          document.getElementById('sroiCalcPortfolioView').style.display = isPortfolio ? 'block' : 'none';
+          if (isPortfolio) renderSroiPortfolio();
+        });
+      });
+    }
+  }
+
+  function renderSroiPortfolio() {
+    const projects = sroiProjectsCache;
+    const nProjects = projects.length;
+    const totalInvestment = projects.reduce((s, p) => s + (p.totalInvestmentEUR || 0), 0);
+    const totalNetValue = projects.reduce((s, p) => s + (p.totalNetValueEUR || 0), 0);
+    const withRatio = projects.filter(p => p.sroiRatio !== null && p.sroiRatio !== undefined);
+    const avgSroi = withRatio.length ? withRatio.reduce((s, p) => s + p.sroiRatio, 0) / withRatio.length : null;
+
+    document.getElementById('sroiPortfolioStrip').innerHTML = `
+      <div class="kpi-card">
+        <div class="kpi-header"><span class="kpi-title">Progetti</span><span class="kpi-icon">🗂️</span></div>
+        <div class="kpi-body"><h2 class="kpi-value">${nProjects}</h2></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-header"><span class="kpi-title">Investimento totale</span><span class="kpi-icon">💶</span></div>
+        <div class="kpi-body"><h2 class="kpi-value">${formatEUR(totalInvestment)}</h2></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-header"><span class="kpi-title">Valore sociale netto totale</span><span class="kpi-icon">📈</span></div>
+        <div class="kpi-body"><h2 class="kpi-value">${formatEUR(totalNetValue)}</h2></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-header"><span class="kpi-title">SROI medio (progetti con dati)</span><span class="kpi-icon">🎯</span></div>
+        <div class="kpi-body"><h2 class="kpi-value">${avgSroi !== null ? avgSroi.toFixed(2) + 'x' : 'N/D'}</h2></div>
+      </div>
+    `;
+
+    const tbody = document.getElementById('sroiPortfolioTableBody');
+    if (nProjects === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center">Nessun progetto ancora creato.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = [...projects].sort((a, b) => (b.sroiRatio || 0) - (a.sroiRatio || 0)).map(p => `
+      <tr>
+        <td style="font-weight:600">${escapeHtml(p.name)}</td>
+        <td style="font-family: var(--font-mono); color: var(--green-d)">${escapeHtml(p.serviceCluster || '-')}</td>
+        <td>${p.year || ''}</td>
+        <td><span class="status-badge ${p.status === 'Completato' ? 'win' : 'prep'}">${p.status}</span></td>
+        <td style="font-family: var(--font-mono)">${formatEUR(p.totalInvestmentEUR)}</td>
+        <td style="font-family: var(--font-mono)">${formatEUR(p.totalNetValueEUR)}</td>
+        <td style="font-weight:700">${p.sroiRatio !== null && p.sroiRatio !== undefined ? p.sroiRatio.toFixed(2) + 'x' : 'N/D'}</td>
+      </tr>
+    `).join('');
   }
 
   async function refreshSroiProjectList() {
@@ -782,8 +888,9 @@ document.addEventListener('DOMContentLoaded', () => {
           <span class="project-card-name">${escapeHtml(p.name)}</span>
           <span class="status-badge ${p.status === 'Completato' ? 'win' : 'prep'}">${p.status}</span>
         </div>
-        <div class="project-card-meta">${escapeHtml(p.serviceCluster || '-')} · ${p.year || ''}</div>
-        <div class="project-card-sroi">SROI: <span>${p.sroiRatio !== null ? p.sroiRatio.toFixed(2) : 'N/D'}</span></div>
+        <div class="project-card-meta">${escapeHtml(p.serviceCluster || '-')} · ${p.year || ''}${p.purpose ? ' · ' + escapeHtml(p.purpose) : ''}</div>
+        <div class="project-card-sroi">SROI/BCR: <span>${p.sroiRatio !== null ? p.sroiRatio.toFixed(2) : 'N/D'}</span></div>
+        <div class="project-card-van">VAN sociale: <span>${p.vanSocialeEUR !== null && p.vanSocialeEUR !== undefined ? formatEUR(p.vanSocialeEUR) : 'N/D'}</span></div>
       </div>
     `).join('');
     box.querySelectorAll('.project-card').forEach(card => {
@@ -869,15 +976,19 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
   }
 
+  const PROJECT_PURPOSES = ['Gara pubblica', 'Candidatura PNRR', 'Benchmarking interno', 'Altro'];
+
   function renderProjectDetail(data) {
     const el = document.getElementById('sroiProjectDetail');
     const sroiDisplay = data.sroiRatio !== null && data.sroiRatio !== undefined ? data.sroiRatio.toFixed(2) + 'x' : 'N/D';
+    const vanDisplay = data.vanSocialeEUR !== null && data.vanSocialeEUR !== undefined ? formatEUR(data.vanSocialeEUR) : 'N/D';
 
     el.innerHTML = `
       <div class="sroicalc-detail-header">
         <h2>${escapeHtml(data.name)}</h2>
         <div style="display:flex; align-items:center; gap:14px;">
-          <span class="stat-label">SROI Ratio: <strong style="color:var(--green-d); font-size:15px;">${sroiDisplay}</strong></span>
+          <span class="stat-label">SROI/BCR: <strong id="sroiHeaderRatio" style="color:var(--green-d); font-size:15px;">${sroiDisplay}</strong></span>
+          <span class="stat-label">VAN Sociale: <strong id="sroiHeaderVan" style="font-size:15px;">${vanDisplay}</strong></span>
           <button class="btn btn-secondary btn-sm" id="sroiDeleteProjectBtn">Elimina</button>
           <button class="btn btn-primary btn-sm" id="sroiSaveProjectBtn">Salva</button>
         </div>
@@ -898,6 +1009,13 @@ document.addEventListener('DOMContentLoaded', () => {
             <select id="sroiFieldStatus">
               <option value="In corso" ${data.status === 'In corso' ? 'selected' : ''}>In corso</option>
               <option value="Completato" ${data.status === 'Completato' ? 'selected' : ''}>Completato</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label>Finalità dell'analisi</label>
+            <select id="sroiFieldPurpose">
+              <option value="">-</option>
+              ${PROJECT_PURPOSES.map(p => `<option value="${p}" ${p === data.purpose ? 'selected' : ''}>${p}</option>`).join('')}
             </select>
           </div>
           <div class="filter-group">
@@ -936,6 +1054,15 @@ document.addEventListener('DOMContentLoaded', () => {
         <div id="sroiBenefitCards">${data.benefits.map(benefitCardHtml).join('') || '<p class="text-center">Nessun beneficio aggiunto. Usa "Libreria" o "+ Custom".</p>'}</div>
         <div class="total-row" style="margin-top:8px;"><span>Valore Sociale Netto Totale</span><span>${formatEUR(data.totalNetValueEUR)}</span></div>
       </div>
+
+      <div class="card glass" style="margin-top:20px;">
+        <div class="card-header"><h3 class="card-title">Simulazione di Scenario</h3></div>
+        <p class="outcome-form-note">
+          Applica un fattore ±30% a tutte le quantità inserite sopra, per un intervallo di sensibilità attorno al caso
+          Base (quello salvato). È una simulazione a schermo: non modifica né salva nulla.
+        </p>
+        <div id="scenarioSection">${scenarioSectionHtml(data.benefits, data.totalInvestmentEUR)}</div>
+      </div>
     `;
 
     attachProjectDetailHandlers(data.id);
@@ -950,6 +1077,7 @@ document.addEventListener('DOMContentLoaded', () => {
           name: document.getElementById('sroiFieldName').value,
           serviceCluster: document.getElementById('sroiFieldCluster').value || null,
           status: document.getElementById('sroiFieldStatus').value,
+          purpose: document.getElementById('sroiFieldPurpose').value || null,
           year: parseInt(document.getElementById('sroiFieldYear').value, 10) || null,
           directBeneficiaries: parseInt(document.getElementById('sroiFieldBeneficiaries').value, 10) || null,
           description: document.getElementById('sroiFieldDescription').value,
@@ -1107,6 +1235,51 @@ document.addEventListener('DOMContentLoaded', () => {
     return total;
   }
 
+  const SCENARIOS = [
+    { key: 'prudente', label: 'Prudente', mult: 0.7 },
+    { key: 'base', label: 'Base (salvato)', mult: 1.0 },
+    { key: 'ottimistico', label: 'Ottimistico', mult: 1.3 },
+  ];
+
+  function scenarioSectionHtml(benefits, totalInvestment) {
+    if (!benefits.length || !totalInvestment) {
+      return '<p class="text-center">Aggiungi almeno una voce di costo e un beneficio con quantità per vedere la simulazione.</p>';
+    }
+    const results = SCENARIOS.map(s => {
+      const totalNetValue = benefits.reduce((sum, b) => sum + computeBenefitNetValueClient(
+        (b.quantity || 0) * s.mult, b.proxyValueEUR, b.durationYears, b.deadweightPct, b.attributionPct, b.dropoffPct
+      ), 0);
+      return {
+        ...s,
+        totalNetValue,
+        sroiRatio: totalInvestment ? totalNetValue / totalInvestment : null,
+        vanSociale: totalNetValue - totalInvestment,
+      };
+    });
+
+    const gridHtml = `
+      <div class="scenario-grid">
+        ${results.map(r => `
+          <div class="scenario-col ${r.key === 'base' ? 'scenario-col-base' : ''}">
+            <div class="scenario-label">${r.label}<span class="scenario-mult">${r.key === 'base' ? '×1,0' : (r.mult > 1 ? '+' : '') + Math.round((r.mult - 1) * 100) + '%'}</span></div>
+            <div class="scenario-sroi">${r.sroiRatio !== null ? r.sroiRatio.toFixed(2) + 'x' : 'N/D'}</div>
+            <div class="scenario-van">VAN: ${formatEUR(r.vanSociale)}</div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+
+    const totalNet = results.find(r => r.key === 'base').totalNetValue;
+    const sorted = [...benefits].filter(b => b.netValueEUR !== undefined).sort((a, b) => (b.netValueEUR || 0) - (a.netValueEUR || 0));
+    const top = sorted[0];
+    const sensitivityNote = (top && totalNet) ? (
+      `Nello scenario Base, il beneficio che pesa di più sul valore netto è "${escapeHtml(top.title)}": ` +
+      `${formatEUR(top.netValueEUR)} (${(top.netValueEUR / totalNet * 100).toFixed(0)}% del totale).`
+    ) : 'Nessun beneficio con valore netto calcolato nello scenario Base.';
+
+    return gridHtml + `<p class="page-subtitle" style="margin-top:12px;">${sensitivityNote}</p>`;
+  }
+
   function recomputeBenefitCard(card) {
     const fields = {};
     card.querySelectorAll('.bf').forEach(input => { fields[input.dataset.field] = parseFloat(input.value) || 0; });
@@ -1125,13 +1298,21 @@ document.addEventListener('DOMContentLoaded', () => {
       totalInvestment += parseFloat(input.value) || 0;
     });
     let totalNetValue = 0;
+    const liveBenefits = [];
     detail.querySelectorAll('.benefit-card').forEach(card => {
       const fields = {};
       card.querySelectorAll('.bf').forEach(input => { fields[input.dataset.field] = parseFloat(input.value) || 0; });
-      totalNetValue += computeBenefitNetValueClient(
+      const netValueEUR = computeBenefitNetValueClient(
         fields.quantity, fields.proxyValueEUR, fields.durationYears,
         fields.deadweightPct, fields.attributionPct, fields.dropoffPct
       );
+      totalNetValue += netValueEUR;
+      liveBenefits.push({
+        title: card.querySelector('.benefit-title-input').value,
+        quantity: fields.quantity, proxyValueEUR: fields.proxyValueEUR, durationYears: fields.durationYears,
+        deadweightPct: fields.deadweightPct, attributionPct: fields.attributionPct, dropoffPct: fields.dropoffPct,
+        netValueEUR,
+      });
     });
 
     const totalRows = detail.querySelectorAll('.total-row');
@@ -1139,8 +1320,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (totalRows[1]) totalRows[1].querySelector('span:last-child').textContent = formatEUR(totalNetValue);
 
     const sroiRatio = totalInvestment ? totalNetValue / totalInvestment : null;
-    const sroiHeader = detail.querySelector('.sroicalc-detail-header strong');
+    const sroiHeader = document.getElementById('sroiHeaderRatio');
     if (sroiHeader) sroiHeader.textContent = sroiRatio !== null ? sroiRatio.toFixed(2) + 'x' : 'N/D';
+    const vanHeader = document.getElementById('sroiHeaderVan');
+    if (vanHeader) vanHeader.textContent = formatEUR(totalNetValue - totalInvestment);
+
+    const scenarioBox = document.getElementById('scenarioSection');
+    if (scenarioBox) scenarioBox.innerHTML = scenarioSectionHtml(liveBenefits, totalInvestment);
   }
 
   // ------------------------------------------------------------------
@@ -1399,6 +1585,50 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ------------------------------------------------------------------
+  // PAGE: Impostazioni
+  // ------------------------------------------------------------------
+  let overviewRefreshTimer = null;
+
+  function scheduleOverviewRefresh(seconds) {
+    if (overviewRefreshTimer) clearInterval(overviewRefreshTimer);
+    overviewRefreshTimer = null;
+    if (seconds > 0) overviewRefreshTimer = setInterval(fetchOverview, seconds * 1000);
+  }
+
+  async function loadSettingsPage() {
+    const res = await apiFetch(`${API_BASE}/settings`);
+    const s = await res.json();
+    document.getElementById('setRefreshInterval').value = String(s.overview_refresh_seconds);
+    document.getElementById('setSogliaAttenzione').value = Math.round(s.anomalia_soglia_attenzione * 100);
+    document.getElementById('setSogliaCritico').value = Math.round(s.anomalia_soglia_critico * 100);
+    document.getElementById('setSaveBtn').onclick = saveSettings;
+  }
+
+  async function saveSettings() {
+    const statusEl = document.getElementById('setSaveStatus');
+    const payload = {
+      overview_refresh_seconds: parseInt(document.getElementById('setRefreshInterval').value, 10),
+      anomalia_soglia_attenzione: parseFloat(document.getElementById('setSogliaAttenzione').value) / 100,
+      anomalia_soglia_critico: parseFloat(document.getElementById('setSogliaCritico').value) / 100,
+    };
+    statusEl.textContent = 'Salvataggio...';
+    try {
+      const res = await apiFetch(`${API_BASE}/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const s = await res.json();
+      scheduleOverviewRefresh(s.overview_refresh_seconds);
+      anomalieLoaded = false; // forza il ricalcolo con le nuove soglie alla prossima visita
+      statusEl.textContent = 'Salvato.';
+    } catch (err) {
+      console.error(err);
+      statusEl.textContent = 'Errore nel salvataggio.';
+    }
+  }
+
+  // ------------------------------------------------------------------
   // Init
   // ------------------------------------------------------------------
   let dashboardInitialized = false;
@@ -1406,7 +1636,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (dashboardInitialized) return;
     dashboardInitialized = true;
     fetchOverview();
-    setInterval(fetchOverview, 30000);
+    scheduleOverviewRefresh(30);
+    apiFetch(`${API_BASE}/settings`)
+      .then(r => r.json())
+      .then(s => scheduleOverviewRefresh(s.overview_refresh_seconds))
+      .catch(() => {});
   }
 
   if (getToken()) initDashboard();
