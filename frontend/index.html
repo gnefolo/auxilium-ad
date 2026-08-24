@@ -51,7 +51,19 @@
       <div class="nav-section-label">Panoramica</div>
       <a href="#" class="nav-item active" data-page="overview">
         <span class="nav-icon">📊</span>
-        Overview
+        Dashboard
+      </a>
+      <a href="#" class="nav-item" data-page="kpi">
+        <span class="nav-icon">📐</span>
+        KPI Operativi
+      </a>
+      <a href="#" class="nav-item" data-page="gare">
+        <span class="nav-icon">📋</span>
+        Gare d'Appalto
+      </a>
+      <a href="#" class="nav-item" data-page="impatto">
+        <span class="nav-icon">💠</span>
+        Impatto &amp; SROI
       </a>
 
       <div class="nav-section-label">Settori</div>
@@ -85,13 +97,9 @@
       </a>
 
       <div class="nav-section-label">Strumenti</div>
-      <a href="#" class="nav-item" data-page="gare">
-        <span class="nav-icon">📋</span>
-        Gare & Appalti
-      </a>
-      <a href="#" class="nav-item" data-page="footprint">
-        <span class="nav-icon">🌍</span>
-        Footprint (SAM)
+      <a href="#" class="nav-item" data-page="esporta">
+        <span class="nav-icon">⬇️</span>
+        Esporta Report
       </a>
       <a href="#" class="nav-item" data-page="sroicalc">
         <span class="nav-icon">🧮</span>
@@ -129,8 +137,8 @@
   <main class="main-content">
     <header class="topbar">
       <div class="topbar-left">
-        <h1 class="page-title" id="pageTitle">Executive Overview</h1>
-        <p class="page-subtitle" id="pageSubtitle">Sintesi delle performance aziendali aggiornata in tempo reale.</p>
+        <h1 class="page-title" id="pageTitle">Dashboard</h1>
+        <p class="page-subtitle" id="pageSubtitle">Sintesi delle performance aziendali e footprint economico, aggiornati in tempo reale.</p>
       </div>
       <div class="topbar-right">
         <div class="server-status">
@@ -209,65 +217,11 @@
             <div class="stat-list" id="topClustersList"></div>
           </div>
         </div>
-      </div>
 
-      <!-- ============ PAGE: GARE & APPALTI ============ -->
-      <div class="page" id="page-gare">
-        <div class="filter-bar">
-          <div class="filter-group">
-            <label for="filterYear">Anno</label>
-            <select id="filterYear"></select>
-          </div>
-          <div class="filter-group">
-            <label for="filterCluster">Cluster di servizio</label>
-            <select id="filterCluster">
-              <option value="">Tutti</option>
-            </select>
-          </div>
-          <div class="filter-group" style="flex:1; min-width:220px;">
-            <label for="gareSearch">Cerca (servizio, ente, sito)</label>
-            <input type="text" id="gareSearch" placeholder="es. Roma, ADI, Comune di...">
-          </div>
+        <!-- Footprint Economico (Fase 3, SAM): bilanci e impatto macroeconomico diretto/indiretto/indotto -->
+        <div class="card-header" style="margin-top:32px; padding-bottom:8px; border-bottom:1px solid var(--border-color);">
+          <h3 class="card-title" style="font-size:18px;">Footprint Economico</h3>
         </div>
-
-        <div class="pill-filter-row" id="gareStatusPills">
-          <button class="pill-filter active" data-status="">Tutte</button>
-          <button class="pill-filter" data-status="In essere">In essere</button>
-          <button class="pill-filter" data-status="Concluso">Concluse</button>
-        </div>
-
-        <section class="kpi-grid" id="gareSummaryStrip" style="margin: 0 0 20px;"></section>
-
-        <div class="card glass">
-          <div class="card-header">
-            <h3 class="card-title">Storico Commesse</h3>
-            <button class="btn btn-secondary btn-sm" id="exportExcelBtn" title="Esporta in Excel">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 3h8M4 13h8M2 8h12M6 8v5M10 8v5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-              Export XLSX
-            </button>
-          </div>
-          <div class="table-container">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Sito</th>
-                  <th>Servizio / Ente Committente</th>
-                  <th>Valore</th>
-                  <th>Regione</th>
-                  <th>Stato</th>
-                  <th>Cluster</th>
-                </tr>
-              </thead>
-              <tbody id="gareBody">
-                <tr><td colspan="6" class="text-center">Caricamento dati...</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- ============ PAGE: FOOTPRINT (SAM) ============ -->
-      <div class="page" id="page-footprint">
 
         <div class="filter-bar">
           <div class="filter-group">
@@ -360,6 +314,61 @@
             <div class="chart-container">
               <canvas id="benchmarkRadarChart"></canvas>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ PAGE: GARE & APPALTI ============ -->
+      <div class="page" id="page-gare">
+        <div class="filter-bar">
+          <div class="filter-group">
+            <label for="filterYear">Anno</label>
+            <select id="filterYear"></select>
+          </div>
+          <div class="filter-group">
+            <label for="filterCluster">Cluster di servizio</label>
+            <select id="filterCluster">
+              <option value="">Tutti</option>
+            </select>
+          </div>
+          <div class="filter-group" style="flex:1; min-width:220px;">
+            <label for="gareSearch">Cerca (servizio, ente, sito)</label>
+            <input type="text" id="gareSearch" placeholder="es. Roma, ADI, Comune di...">
+          </div>
+        </div>
+
+        <div class="pill-filter-row" id="gareStatusPills">
+          <button class="pill-filter active" data-status="">Tutte</button>
+          <button class="pill-filter" data-status="In essere">In essere</button>
+          <button class="pill-filter" data-status="Concluso">Concluse</button>
+        </div>
+
+        <section class="kpi-grid" id="gareSummaryStrip" style="margin: 0 0 20px;"></section>
+
+        <div class="card glass">
+          <div class="card-header">
+            <h3 class="card-title">Storico Commesse</h3>
+            <button class="btn btn-secondary btn-sm" id="exportExcelBtn" title="Esporta in Excel">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 3h8M4 13h8M2 8h12M6 8v5M10 8v5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              Export XLSX
+            </button>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Sito</th>
+                  <th>Servizio / Ente Committente</th>
+                  <th>Valore</th>
+                  <th>Regione</th>
+                  <th>Stato</th>
+                  <th>Cluster</th>
+                </tr>
+              </thead>
+              <tbody id="gareBody">
+                <tr><td colspan="6" class="text-center">Caricamento dati...</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -498,11 +507,6 @@
 
       <!-- ============ PAGE: CALCOLO SROI (rigoroso) ============ -->
       <div class="page" id="page-sroicalc">
-        <div class="pill-filter-row" id="sroiCalcViewTabs">
-          <button class="pill-filter active" data-view="progetti">Progetti</button>
-          <button class="pill-filter" data-view="portafoglio">Confronto portafoglio</button>
-        </div>
-
         <div class="sroicalc-layout" id="sroiCalcProjectsView">
           <div class="sroicalc-list glass">
             <div class="sroicalc-list-header">
@@ -517,19 +521,43 @@
             </div>
           </div>
         </div>
+      </div>
 
-        <div id="sroiCalcPortfolioView" style="display:none;">
-          <section class="kpi-grid" id="sroiPortfolioStrip" style="margin-bottom:20px;"></section>
-          <div class="card glass">
-            <div class="card-header"><h3 class="card-title">Tutti i progetti</h3></div>
-            <div class="table-container">
-              <table class="data-table">
-                <thead>
-                  <tr><th>Progetto</th><th>Cluster</th><th>Anno</th><th>Stato</th><th>Investimento</th><th>Valore netto</th><th>SROI</th></tr>
-                </thead>
-                <tbody id="sroiPortfolioTableBody"></tbody>
-              </table>
-            </div>
+      <!-- ============ PAGE: KPI OPERATIVI ============ -->
+      <div class="page" id="page-kpi">
+        <section class="kpi-grid" id="kpiOperativiStrip" style="margin-bottom:20px;"></section>
+        <div class="card glass">
+          <div class="card-header"><h3 class="card-title">Catalogo KPI Economici — per Settore</h3></div>
+          <p class="page-subtitle" style="margin-bottom:14px;">
+            Indicatori economici reali (FactServiceRevenue), calcolati per ciascun settore di servizio. Gli
+            indicatori di qualità/processo e di volume di servizio non hanno oggi un valore reale per nessun
+            settore (richiedono dati di monitoraggio non disponibili in questo progetto): sono riportati "N/D"
+            nella pagina di ciascun Settore invece di essere stimati qui.
+          </p>
+          <div class="table-container">
+            <table class="data-table">
+              <thead><tr><th>Indicatore</th><th>Settore</th><th>Valore</th><th>Fonte</th><th>Stato</th></tr></thead>
+              <tbody id="kpiOperativiTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ PAGE: IMPATTO & SROI (portafoglio) ============ -->
+      <div class="page" id="page-impatto">
+        <section class="kpi-grid" id="sroiPortfolioStrip" style="margin-bottom:20px;"></section>
+        <div class="card glass">
+          <div class="card-header">
+            <h3 class="card-title">Tutti i progetti</h3>
+            <button class="btn btn-primary btn-sm" id="impattoNewProjectBtn">+ Nuovo progetto</button>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr><th>Progetto</th><th>Cluster</th><th>Anno</th><th>Finalità</th><th>Stato</th><th>Investimento</th><th>VAN Sociale</th><th>SROI/BCR</th></tr>
+              </thead>
+              <tbody id="sroiPortfolioTableBody"></tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -681,6 +709,25 @@
           </div>
 
         </div>
+      </div>
+
+      <!-- ============ PAGE: ESPORTA REPORT ============ -->
+      <div class="page" id="page-esporta">
+        <div class="settore-score-strip" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));">
+          <div class="score-card" style="text-align:left; cursor:pointer;" id="esportaGareCard">
+            <div class="score-card-icon">📋</div>
+            <div class="score-card-value" style="font-size:14px;">Storico Servizi</div>
+            <div class="score-card-label">Export XLSX di tutte le commesse reali dell'Elenco Servizi (Gare d'Appalto)</div>
+          </div>
+          <div class="score-card sc-navy" style="text-align:left; cursor:pointer;" id="esportaRelazioneCard">
+            <div class="score-card-icon">📄</div>
+            <div class="score-card-value" style="font-size:14px;">Bozza Relazione Tecnica</div>
+            <div class="score-card-label">Vai a "Genera Relazione" per una bozza con track record, impatto SAM e benefici SROI del cluster</div>
+          </div>
+        </div>
+        <p class="page-subtitle" style="margin-top:16px;">
+          Solo le esportazioni realmente disponibili in questo progetto sono elencate qui - niente pulsanti che non generano nulla.
+        </p>
       </div>
 
       <!-- ============ PAGE: IMPOSTAZIONI ============ -->

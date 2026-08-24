@@ -82,8 +82,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const pageSubtitle = document.getElementById('pageSubtitle');
 
   const PAGE_META = {
-    overview: ['Executive Overview', 'Sintesi delle performance aziendali aggiornata in tempo reale.'],
-    gare: ['Gare & Appalti', 'Storico commesse dell\'Elenco Servizi Auxilium, 2015-2024.'],
+    overview: ['Dashboard', 'Sintesi delle performance aziendali e footprint economico, aggiornati in tempo reale.'],
+    kpi: ['KPI Operativi', 'Indicatori economici reali per settore di servizio, dal catalogo KPI standardizzato.'],
+    gare: ['Gare d\'Appalto', 'Storico commesse dell\'Elenco Servizi Auxilium, 2015-2024.'],
+    impatto: ['Impatto & SROI', 'Portafoglio dei progetti SROI/CBA stimati per nuovi bandi e candidature.'],
+    esporta: ['Esporta Report', 'Esportazioni disponibili in questo progetto.'],
     footprint: ['Footprint (SAM)', 'Bilanci e impatto macroeconomico diretto, indiretto e indotto, per entità.'],
     sroicalc: ['Calcolo SROI', 'Stima lo SROI di un NUOVO progetto/bando per la Relazione Tecnica: benefici allineati al cluster, deadweight, attribution e drop-off (metodologia SROI Network).'],
     territorio: ['Territorio', 'Mappa dei siti e valore delle commesse per territorio, dati reali dell\'Elenco Servizi.'],
@@ -185,7 +188,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (pageKey === 'gare') loadGarePage();
-    if (pageKey === 'footprint') loadFootprintPage();
+    if (pageKey === 'kpi') loadKpiOperativiPage();
+    if (pageKey === 'impatto') loadImpattoSroiPage();
+    if (pageKey === 'esporta') loadEsportaPage();
     if (pageKey === 'settore') loadSettorePage(navEl.dataset.cluster);
     if (pageKey === 'relazione') loadRelazionePage();
     if (pageKey === 'sroicalc') loadSroiCalcPage();
@@ -467,6 +472,106 @@ document.addEventListener('DOMContentLoaded', () => {
       ],
       note: 'Dati reali dall\'Elenco Servizi Auxilium (FactServiceRevenue). Campi non presenti in questo progetto (es. CIG, note operative, documenti) non sono mostrati invece di inventarli.',
     });
+  }
+
+  // ------------------------------------------------------------------
+  // PAGE: KPI Operativi (catalogo economico, tutti i settori)
+  // ------------------------------------------------------------------
+  const KPI_VALUE_MAP = {
+    valore_commesse_anno: (e) => formatEUR(e.valoreCommesseEUR),
+    numero_commesse_attive: (e) => String(e.numeroCommesseAttive),
+    numero_commesse_concluse: (e) => String(e.numeroCommesseConcluse),
+    numero_enti_committenti: (e) => String(e.numeroEntiCommittenti),
+    valore_medio_commessa: (e) => formatEUR(e.valoreMedioCommessaEUR),
+    crescita_yoy: (e) => formatPct(e.crescitaYoY),
+    costo_per_utente: (e, data) => data.costoPerUtenteEUR !== null ? formatEUR(data.costoPerUtenteEUR) : 'N/D',
+    costo_per_ora_erogata: (e, data) => data.costoPerOraErogataEUR !== null ? formatEUR(data.costoPerOraErogataEUR) : 'N/D',
+  };
+
+  async function loadKpiOperativiPage() {
+    await ensureServices();
+    const clusters = distinctClusters(allServices);
+    const results = await Promise.all(clusters.map(async c => {
+      const res = await apiFetch(`${API_BASE}/sroi/framework?cluster=${c}&year=${SROI_YEAR}`);
+      return { cluster: c, data: await res.json() };
+    }));
+
+    const totalValue = results.reduce((s, r) => s + (r.data.economics.valoreCommesseEUR || 0), 0);
+    const totalActive = results.reduce((s, r) => s + (r.data.economics.numeroCommesseAttive || 0), 0);
+    const withSroi = results.filter(r => r.data.sroiRatio !== null && r.data.sroiRatio !== undefined).length;
+    const avgQuality = results.reduce((s, r) => s + r.data.indicatorQuality.kpiCatalogPct, 0) / (results.length || 1);
+
+    document.getElementById('kpiOperativiStrip').innerHTML = `
+      <div class="kpi-card">
+        <div class="kpi-header"><span class="kpi-title">Valore commesse totale</span><span class="kpi-icon">💶</span></div>
+        <div class="kpi-body"><h2 class="kpi-value">${formatEUR(totalValue)}</h2></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-header"><span class="kpi-title">Commesse attive totali</span><span class="kpi-icon">📋</span></div>
+        <div class="kpi-body"><h2 class="kpi-value">${totalActive}</h2></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-header"><span class="kpi-title">Settori con SROI calcolato</span><span class="kpi-icon">⚖️</span></div>
+        <div class="kpi-body"><h2 class="kpi-value">${withSroi}/${results.length}</h2></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-header"><span class="kpi-title">Qualità catalogo KPI (media)</span><span class="kpi-icon">✅</span></div>
+        <div class="kpi-body"><h2 class="kpi-value">${avgQuality.toFixed(0)}%</h2></div>
+      </div>
+    `;
+
+    const rows = [];
+    results.forEach(({ cluster, data }) => {
+      data.kpiCatalog.economicKPIs.forEach(item => {
+        const valueFn = KPI_VALUE_MAP[item.id];
+        rows.push({ item, cluster, value: valueFn ? valueFn(data.economics, data) : 'N/D' });
+      });
+    });
+
+    const tbody = document.getElementById('kpiOperativiTableBody');
+    tbody.innerHTML = rows.map((r, i) => `
+      <tr data-row-index="${i}" style="cursor:pointer">
+        <td style="font-weight:600">${escapeHtml(r.item.nome)}</td>
+        <td style="font-family: var(--font-mono); color: var(--green-d)">${escapeHtml(SETTORE_LABELS[r.cluster] || r.cluster)}</td>
+        <td style="font-family: var(--font-mono); font-weight:700">${r.value}</td>
+        <td style="color: var(--text-muted); font-size:0.9em">${escapeHtml(r.item.fonte || '-')}</td>
+        <td>${kpiStatusBadge(r.item.status)}</td>
+      </tr>
+    `).join('');
+    tbody.querySelectorAll('tr').forEach(row => {
+      const r = rows[parseInt(row.dataset.rowIndex, 10)];
+      row.addEventListener('click', () => openDrawer({
+        eyebrow: `KPI · ${SETTORE_LABELS[r.cluster] || r.cluster}`,
+        title: r.item.nome,
+        sections: [{ rows: [
+          ['Settore', SETTORE_LABELS[r.cluster] || r.cluster],
+          ['Valore', r.value],
+          ['Unità', r.item.unita],
+          ['Definizione', r.item.definizione],
+          ['Fonte', r.item.fonte],
+          ['Stato', r.item.status === 'calcolabile_oggi' ? 'Calcolabile oggi' : 'Richiede monitoraggio'],
+        ] }],
+        note: 'Indicatore economico reale (FactServiceRevenue), calcolato per questo settore.',
+      }));
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // PAGE: Esporta Report
+  // ------------------------------------------------------------------
+  function loadEsportaPage() {
+    const box = document.getElementById('esportaGareCard');
+    if (!box.dataset.wired) {
+      box.dataset.wired = '1';
+      box.addEventListener('click', async () => {
+        showPage('gare', document.querySelector('.nav-item[data-page="gare"]'));
+        await loadGarePage();
+        document.getElementById('exportExcelBtn').click();
+      });
+      document.getElementById('esportaRelazioneCard').addEventListener('click', () => {
+        showPage('relazione', document.querySelector('.nav-item[data-page="relazione"]'));
+      });
+    }
   }
 
   // ------------------------------------------------------------------
@@ -1086,20 +1191,16 @@ document.addEventListener('DOMContentLoaded', () => {
     await ensureServices();
     await refreshSroiProjectList();
     document.getElementById('sroiNewProjectBtn').onclick = createNewSroiProject;
+  }
 
-    const tabs = document.getElementById('sroiCalcViewTabs');
-    if (!tabs.dataset.wired) {
-      tabs.dataset.wired = '1';
-      tabs.querySelectorAll('.pill-filter').forEach(btn => {
-        btn.addEventListener('click', () => {
-          tabs.querySelectorAll('.pill-filter').forEach(b => b.classList.toggle('active', b === btn));
-          const isPortfolio = btn.dataset.view === 'portafoglio';
-          document.getElementById('sroiCalcProjectsView').style.display = isPortfolio ? 'none' : 'flex';
-          document.getElementById('sroiCalcPortfolioView').style.display = isPortfolio ? 'block' : 'none';
-          if (isPortfolio) renderSroiPortfolio();
-        });
-      });
-    }
+  async function loadImpattoSroiPage() {
+    await ensureServices();
+    await refreshSroiProjectList();
+    renderSroiPortfolio();
+    document.getElementById('impattoNewProjectBtn').onclick = async () => {
+      showPage('sroicalc', document.querySelector('.nav-item[data-page="sroicalc"]'));
+      await createNewSroiProject();
+    };
   }
 
   function renderSroiPortfolio() {
@@ -1131,20 +1232,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const tbody = document.getElementById('sroiPortfolioTableBody');
     if (nProjects === 0) {
-      tbody.innerHTML = '<tr><td colspan="7" class="text-center">Nessun progetto ancora creato.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center">Nessun progetto ancora creato. Usa "Calcolo SROI" per crearne uno.</td></tr>';
       return;
     }
     tbody.innerHTML = [...projects].sort((a, b) => (b.sroiRatio || 0) - (a.sroiRatio || 0)).map(p => `
-      <tr>
+      <tr style="cursor:pointer" data-project-id="${p.id}">
         <td style="font-weight:600">${escapeHtml(p.name)}</td>
         <td style="font-family: var(--font-mono); color: var(--green-d)">${escapeHtml(p.serviceCluster || '-')}</td>
         <td>${p.year || ''}</td>
+        <td>${p.purpose ? escapeHtml(p.purpose) : '<span style="color:var(--text-muted)">-</span>'}</td>
         <td><span class="status-badge ${p.status === 'Completato' ? 'win' : 'prep'}">${p.status}</span></td>
         <td style="font-family: var(--font-mono)">${formatEUR(p.totalInvestmentEUR)}</td>
-        <td style="font-family: var(--font-mono)">${formatEUR(p.totalNetValueEUR)}</td>
+        <td style="font-family: var(--font-mono)">${p.vanSocialeEUR !== null && p.vanSocialeEUR !== undefined ? formatEUR(p.vanSocialeEUR) : 'N/D'}</td>
         <td style="font-weight:700">${p.sroiRatio !== null && p.sroiRatio !== undefined ? p.sroiRatio.toFixed(2) + 'x' : 'N/D'}</td>
       </tr>
     `).join('');
+    tbody.querySelectorAll('tr[data-project-id]').forEach(row => {
+      row.addEventListener('click', () => {
+        showPage('sroicalc', document.querySelector('.nav-item[data-page="sroicalc"]'));
+        selectSroiProject(parseInt(row.dataset.projectId, 10));
+      });
+    });
   }
 
   async function refreshSroiProjectList() {
@@ -1913,6 +2021,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (dashboardInitialized) return;
     dashboardInitialized = true;
     fetchOverview();
+    loadFootprintPage();
     scheduleOverviewRefresh(30);
     apiFetch(`${API_BASE}/settings`)
       .then(r => r.json())
