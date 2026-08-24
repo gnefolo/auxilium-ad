@@ -85,7 +85,6 @@ document.addEventListener('DOMContentLoaded', () => {
     overview: ['Executive Overview', 'Sintesi delle performance aziendali aggiornata in tempo reale.'],
     gare: ['Gare & Appalti', 'Storico commesse dell\'Elenco Servizi Auxilium, 2015-2024.'],
     footprint: ['Footprint (SAM)', 'Bilanci e impatto macroeconomico diretto, indiretto e indotto, per entità.'],
-    sroi: ['SROI', 'SROI delle commesse attive di Auxilium, per cluster di servizio, e qualità dei dati di monitoraggio disponibili.'],
     sroicalc: ['Calcolo SROI', 'Stima lo SROI di un NUOVO progetto/bando per la Relazione Tecnica: benefici allineati al cluster, deadweight, attribution e drop-off (metodologia SROI Network).'],
     territorio: ['Territorio', 'Mappa dei siti e valore delle commesse per territorio, dati reali dell\'Elenco Servizi.'],
     anomalie: ['Anomalie', 'Deviazioni statistiche reali rispetto alla media storica delle commesse.'],
@@ -140,22 +139,54 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ------------------------------------------------------------------
+  // Drawer laterale generico (dettaglio commesse, KPI, ecc.)
+  // ------------------------------------------------------------------
+  function openDrawer({ eyebrow, title, sections, note }) {
+    document.getElementById('drawerEyebrow').textContent = eyebrow || '';
+    document.getElementById('drawerTitle').textContent = title || '';
+    document.getElementById('drawerBody').innerHTML = (sections || []).map(sec => `
+      <div class="drawer-section">
+        ${sec.label ? `<div class="drawer-section-label">${escapeHtml(sec.label)}</div>` : ''}
+        ${(sec.rows || []).map(r => `
+          <div class="drawer-row">
+            <span class="drawer-row-label">${escapeHtml(r[0])}</span>
+            <span class="drawer-row-value">${escapeHtml(r[1] === null || r[1] === undefined || r[1] === '' ? 'N/D' : String(r[1]))}</span>
+          </div>
+        `).join('')}
+      </div>
+    `).join('') + (note ? `<div class="drawer-note">${escapeHtml(note)}</div>` : '');
+
+    document.getElementById('drawerOverlay').classList.add('open');
+    document.getElementById('drawerPanel').classList.add('open');
+  }
+
+  function closeDrawer() {
+    document.getElementById('drawerOverlay').classList.remove('open');
+    document.getElementById('drawerPanel').classList.remove('open');
+  }
+
+  document.getElementById('drawerOverlay').addEventListener('click', closeDrawer);
+  document.getElementById('drawerCloseBtn').addEventListener('click', closeDrawer);
+
+  // ------------------------------------------------------------------
   // Navigazione tra pagine
   // ------------------------------------------------------------------
-  function showPage(pageKey) {
+  function showPage(pageKey, navEl) {
     document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
     document.getElementById(`page-${pageKey}`).classList.add('active');
 
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-    document.querySelector(`.nav-item[data-page="${pageKey}"]`).classList.add('active');
+    (navEl || document.querySelector(`.nav-item[data-page="${pageKey}"]`)).classList.add('active');
 
-    const [title, subtitle] = PAGE_META[pageKey];
-    pageTitle.textContent = title;
-    pageSubtitle.textContent = subtitle;
+    if (pageKey !== 'settore') {
+      const [title, subtitle] = PAGE_META[pageKey];
+      pageTitle.textContent = title;
+      pageSubtitle.textContent = subtitle;
+    }
 
     if (pageKey === 'gare') loadGarePage();
     if (pageKey === 'footprint') loadFootprintPage();
-    if (pageKey === 'sroi') loadSroiPage();
+    if (pageKey === 'settore') loadSettorePage(navEl.dataset.cluster);
     if (pageKey === 'relazione') loadRelazionePage();
     if (pageKey === 'sroicalc') loadSroiCalcPage();
     if (pageKey === 'territorio') loadTerritorioPage();
@@ -166,7 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.nav-item').forEach(item => {
     item.addEventListener('click', (e) => {
       e.preventDefault();
-      showPage(item.dataset.page);
+      showPage(item.dataset.page, item);
     });
   });
 
@@ -196,6 +227,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function distinctClusters(services) {
     return [...new Set(services.map(s => s.ServiceCluster))].sort();
+  }
+
+  async function ensureServiceRevenueRows() {
+    if (allServiceRevenueRows) return allServiceRevenueRows;
+    const res = await apiFetch(`${API_BASE}/service-revenue`);
+    allServiceRevenueRows = await res.json();
+    return allServiceRevenueRows;
   }
 
   // ------------------------------------------------------------------
@@ -310,10 +348,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchInput = document.getElementById('gareSearch');
     const pillsBox = document.getElementById('gareStatusPills');
 
-    if (!allServiceRevenueRows) {
-      const res = await apiFetch(`${API_BASE}/service-revenue`);
-      allServiceRevenueRows = await res.json();
+    await ensureServiceRevenueRows();
 
+    if (!yearSelect.dataset.loaded) {
+      yearSelect.dataset.loaded = '1';
       const years = [...new Set(allServiceRevenueRows.map(r => r.year))].sort((a, b) => b - a);
       yearSelect.innerHTML = '<option value="">Tutti gli anni</option>' +
         years.map(y => `<option value="${y}">${y}</option>`).join('');
@@ -394,6 +432,7 @@ document.addEventListener('DOMContentLoaded', () => {
     rows.forEach(r => {
       const statusClass = r.status === 'In essere' ? 'win' : 'eval';
       const row = document.createElement('tr');
+      row.style.cursor = 'pointer';
       row.innerHTML = `
         <td style="font-family: var(--font-mono); color: var(--text-muted)">${r.site}</td>
         <td style="font-weight: 600">${r.contractName}<br><span style="color: var(--text-muted); font-size: 0.85em; font-weight: 400;">${r.enteCommittente}</span></td>
@@ -402,7 +441,31 @@ document.addEventListener('DOMContentLoaded', () => {
         <td><span class="status-badge ${statusClass}">${r.status}</span></td>
         <td style="font-family: var(--font-mono); color: var(--green-d)">${r.cluster}</td>
       `;
+      row.addEventListener('click', () => openGareDrawer(r));
       tbody.appendChild(row);
+    });
+  }
+
+  function openGareDrawer(r) {
+    openDrawer({
+      eyebrow: `Commessa · ${escapeHtml(r.cluster || '-')}`,
+      title: r.contractName,
+      sections: [
+        {
+          label: 'Dettaglio commessa',
+          rows: [
+            ['Ente committente', r.enteCommittente],
+            ['Sito', r.site],
+            ['Comune', r.comune],
+            ['Regione', r.regione],
+            ['Servizio', r.service],
+            ['Anno', r.year],
+            ['Valore', formatEUR(r.revenueEUR)],
+            ['Stato', r.status],
+          ],
+        },
+      ],
+      note: 'Dati reali dall\'Elenco Servizi Auxilium (FactServiceRevenue). Campi non presenti in questo progetto (es. CIG, note operative, documenti) non sono mostrati invece di inventarli.',
     });
   }
 
@@ -647,29 +710,189 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function fillKpiTable(tbodySelector, items, cols) {
     const tbody = document.querySelector(`${tbodySelector} tbody`);
-    tbody.innerHTML = items.map(item => `
-      <tr>
+    tbody.innerHTML = items.map((item, i) => `
+      <tr style="cursor:pointer" data-kpi-index="${i}">
         <td style="font-weight:600">${item.nome}</td>
         <td style="font-family: var(--font-mono); color: var(--text-muted)">${item.unita || ''}</td>
         <td style="color: var(--text-muted); font-size: 0.9em">${cols === 'target' ? (item.targetRiferimento || '-') : item.definizione}</td>
         <td>${kpiStatusBadge(item.status)}</td>
       </tr>
     `).join('');
+    tbody.querySelectorAll('tr').forEach(row => {
+      const item = items[parseInt(row.dataset.kpiIndex, 10)];
+      row.addEventListener('click', () => openKpiDrawer(item));
+    });
   }
 
-  async function loadSroiPage() {
-    const clusterSelect = document.getElementById('clusterSelect');
-    if (!clusterSelect.dataset.loaded) {
-      const services = await ensureServices();
-      const clusters = distinctClusters(services);
-      clusterSelect.innerHTML = clusters.map(c => `<option value="${c}">${c}</option>`).join('');
-      clusterSelect.dataset.loaded = '1';
-      clusterSelect.addEventListener('change', () => loadClusterSroi(clusterSelect.value));
+  function openKpiDrawer(item) {
+    openDrawer({
+      eyebrow: 'Indicatore del catalogo KPI',
+      title: item.nome,
+      sections: [{
+        rows: [
+          ['Unità', item.unita],
+          ['Definizione', item.definizione],
+          ['Target di riferimento', item.targetRiferimento],
+          ['Fonte', item.fonte],
+          ['Stato', item.status === 'calcolabile_oggi' ? 'Calcolabile oggi' : 'Richiede dati di monitoraggio'],
+        ],
+      }],
+      note: 'Catalogo KPI standardizzato per cluster di servizio (Relazione Tecnica, gara PNRR M5C2). Gli indicatori "richiede monitoraggio" non hanno oggi un valore reale: nessun numero è stimato al loro posto.',
+    });
+  }
 
+  const SETTORE_LABELS = {
+    ADI_SAD: 'Cure Domiciliari',
+    RSA_Residenziale: 'Residenzialità',
+    Personale_Sociosanitario: 'Servizi Sociosanitari',
+    Minori_Famiglia: 'Area Minori',
+    Migranti_Accoglienza: 'Accoglienza & Integrazione',
+    Prima_Infanzia: 'Prima Infanzia',
+    Disabilita: 'Disabilità',
+  };
+
+  const SETTORE_META = {
+    ADI_SAD: { title: 'Cure <em>Domiciliari</em>', desc: "Assistenza Domiciliare Integrata e Sociale: interventi socio-sanitari a domicilio per persone anziane e fragili, in alternativa o a supporto dell'istituzionalizzazione." },
+    RSA_Residenziale: { title: '<em>Residenzialità</em>', desc: 'Strutture residenziali (RSA, case alloggio) per anziani e persone non autosufficienti che richiedono assistenza continuativa.' },
+    Personale_Sociosanitario: { title: 'Servizi <em>Sociosanitari</em>', desc: 'Fornitura di personale infermieristico, OSS e tecnico-sanitario in appalto presso strutture ospedaliere e sociosanitarie.' },
+    Minori_Famiglia: { title: 'Area <em>Minori</em>', desc: 'Servizi educativi, comunità e supporto socio-educativo per minori e nuclei familiari in difficoltà.' },
+    Migranti_Accoglienza: { title: 'Accoglienza &amp; <em>Integrazione</em>', desc: 'Gestione di centri di accoglienza e percorsi di integrazione per richiedenti asilo e migranti.' },
+    Prima_Infanzia: { title: 'Prima <em>Infanzia</em>', desc: 'Servizi educativi per la prima infanzia (asili nido e servizi integrativi).' },
+    Disabilita: { title: '<em>Disabilità</em>', desc: 'Servizi di supporto, assistenza e inclusione sociale per persone con disabilità.' },
+  };
+
+  let currentSettoreCluster = null;
+  let settorePageWired = false;
+  let settoreTrendChartInstance = null;
+
+  async function loadSettorePage(cluster) {
+    currentSettoreCluster = cluster;
+
+    const meta = SETTORE_META[cluster] || { title: escapeHtml(cluster), desc: '' };
+    document.getElementById('settoreHeroTitle').innerHTML = meta.title;
+    document.getElementById('settoreHeroDesc').textContent = meta.desc;
+    pageTitle.textContent = SETTORE_LABELS[cluster] || cluster;
+    pageSubtitle.textContent = 'SROI delle commesse attive, impatto macroeconomico e qualità dei dati di monitoraggio per questo settore di servizio.';
+
+    if (!settorePageWired) {
+      settorePageWired = true;
       document.getElementById('outcomeSaveBtn').addEventListener('click', saveOutcome);
-
-      loadClusterSroi(clusterSelect.value);
     }
+
+    await ensureServiceRevenueRows();
+    renderSettoreTrendAndRegioni(cluster);
+
+    await Promise.all([
+      loadClusterSroi(cluster),
+      loadSettoreFootprint(cluster),
+    ]);
+  }
+
+  function scoreCardHtml(icon, value, label, variantClass) {
+    return `
+      <div class="score-card ${variantClass || ''}">
+        <div class="score-card-icon">${icon}</div>
+        <div class="score-card-value">${value}</div>
+        <div class="score-card-label">${label}</div>
+      </div>
+    `;
+  }
+
+  function renderSettoreHeroCard(data) {
+    const e = data.economics;
+    document.getElementById('settoreHeroYear').textContent = e.year;
+    document.getElementById('settoreHeroValue').textContent = formatEUR(e.valoreCommesseEUR);
+    const badge = document.getElementById('settoreHeroBadge');
+    if (e.crescitaYoY !== null && e.crescitaYoY !== undefined) {
+      badge.textContent = `${e.crescitaYoY >= 0 ? '↑' : '↓'} ${formatPct(Math.abs(e.crescitaYoY))} YoY`;
+      badge.style.display = 'inline-block';
+    } else {
+      badge.style.display = 'none';
+    }
+    document.getElementById('settoreHeroMiniStats').innerHTML = `
+      <div class="settore-hero-mini-stat"><b>${e.numeroCommesseAttive}</b>Commesse attive</div>
+      <div class="settore-hero-mini-stat"><b>${e.numeroEntiCommittenti}</b>Enti committenti</div>
+    `;
+  }
+
+  function renderSettoreScoreStrip(data) {
+    const e = data.economics;
+    const sroiDisplay = data.sroiRatio !== null && data.sroiRatio !== undefined ? data.sroiRatio.toFixed(2) + 'x' : 'N/D';
+    document.getElementById('settoreScoreStrip').innerHTML = [
+      scoreCardHtml('⚖️', sroiDisplay, 'SROI / BCR', 'sc-navy'),
+      scoreCardHtml('✅', `${data.indicatorQuality.kpiCatalogPct.toFixed(0)}%`, 'Qualità catalogo KPI'),
+      scoreCardHtml('💶', formatEUR(e.valoreMedioCommessaEUR), 'Valore medio commessa'),
+      scoreCardHtml('📈', formatPct(e.crescitaYoY), 'Crescita YoY', (e.crescitaYoY || 0) < 0 ? 'sc-gold' : ''),
+      scoreCardHtml('🏛️', e.numeroEntiCommittenti, 'Enti committenti', 'sc-navy'),
+    ].join('');
+  }
+
+  function renderSettoreTrendAndRegioni(cluster) {
+    const rows = (allServiceRevenueRows || []).filter(r => r.cluster === cluster);
+
+    const byYear = {};
+    rows.forEach(r => { byYear[r.year] = (byYear[r.year] || 0) + (r.revenueEUR || 0); });
+    const years = Object.keys(byYear).map(Number).sort((a, b) => a - b);
+
+    if (settoreTrendChartInstance) { settoreTrendChartInstance.destroy(); settoreTrendChartInstance = null; }
+    const ctx = document.getElementById('settoreTrendChart').getContext('2d');
+    settoreTrendChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: years,
+        datasets: [{
+          label: 'Valore commesse',
+          data: years.map(y => byYear[y]),
+          borderColor: COLOR_GREEN, backgroundColor: 'rgba(141,182,0,0.12)', fill: true, tension: 0.3,
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => formatEUR(c.parsed.y) } } },
+        scales: {
+          y: { beginAtZero: true, grid: { color: COLOR_GRID }, ticks: { callback: (v) => formatEUR(v) } },
+          x: { grid: { display: false } },
+        },
+      },
+    });
+
+    const lastYear = years.length ? Math.max(...years) : null;
+    const byRegione = {};
+    rows.forEach(r => {
+      if (!r.regione || String(r.year) !== String(lastYear)) return;
+      byRegione[r.regione] = (byRegione[r.regione] || 0) + (r.revenueEUR || 0);
+    });
+    const totalRegione = Object.values(byRegione).reduce((a, b) => a + b, 0);
+    const sortedRegioni = Object.entries(byRegione).sort((a, b) => b[1] - a[1]);
+
+    document.getElementById('settoreRegioni').innerHTML = sortedRegioni.length
+      ? sortedRegioni.map(([regione, value]) => `
+          <div class="stat-row">
+            <span class="stat-label">${escapeHtml(regione)}</span>
+            <span class="stat-value">${formatEUR(value)} <span style="color:var(--text-muted); font-weight:400;">(${totalRegione ? (value / totalRegione * 100).toFixed(0) : 0}%)</span></span>
+          </div>
+        `).join('')
+      : '<p class="text-center">Nessuna commessa attiva per questo cluster.</p>';
+  }
+
+  async function loadSettoreFootprint(cluster) {
+    const res = await apiFetch(`${API_BASE}/sam/cluster-footprint?cluster=${cluster}&year=${SROI_YEAR}`);
+    const data = await res.json();
+    const box = document.getElementById('settoreImpactStats');
+    document.getElementById('settoreImpactNote').textContent = data.ipotesi ||
+      'Impatto non calcolabile: nessuna commessa reale o dato di bilancio disponibile per questo cluster/anno.';
+
+    if (!data.total) {
+      box.innerHTML = '<div class="stat-row"><span class="stat-label">Impatto non calcolabile per questo cluster/anno.</span></div>';
+      return;
+    }
+    box.innerHTML = `
+      <div class="stat-row"><span class="stat-label">Output totale (diretto + Tipo I)</span><span class="stat-value">${formatEUR(data.total.type1_leontief.outputEUR)}</span></div>
+      <div class="stat-row"><span class="stat-label">Output totale (diretto + Tipo II, con indotto)</span><span class="stat-value accent">${formatEUR(data.total.type2_sam.outputEUR)}</span></div>
+      <div class="stat-row"><span class="stat-label">Valore aggiunto totale (Tipo II)</span><span class="stat-value">${formatEUR(data.total.type2_sam.valueAddedEUR)}</span></div>
+      <div class="stat-row"><span class="stat-label">Moltiplicatore Tipo I / Tipo II</span><span class="stat-value">${data.impact.type1_leontief.outputMultiplier.toFixed(2)}x / ${data.impact.type2_sam.outputMultiplier.toFixed(2)}x</span></div>
+      <div class="stat-row"><span class="stat-label">Occupazione diretta stimata</span><span class="stat-value">${formatNumber(data.direct.jobsEstimate, 1)}</span></div>
+    `;
   }
 
   const SROI_YEAR = 2024;
@@ -678,6 +901,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const res = await apiFetch(`${API_BASE}/sroi/framework?cluster=${cluster}&year=${SROI_YEAR}`);
     const data = await res.json();
     renderSroi(data);
+    renderSettoreHeroCard(data);
+    renderSettoreScoreStrip(data);
   }
 
   const CONFIDENCE_BADGE_CLASS = { ALTA: 'kpi-ok', MEDIA: 'prep', BASSA: 'kpi-pending' };
@@ -810,7 +1035,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function saveOutcome() {
-    const cluster = document.getElementById('clusterSelect').value;
+    const cluster = currentSettoreCluster;
     const statusEl = document.getElementById('outcomeSaveStatus');
     const benefitQuantities = {};
     currentBenefitRows.forEach(b => { if (b.quantity) benefitQuantities[String(b.benefitIndex)] = b.quantity; });
@@ -833,6 +1058,8 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       const data = await res.json();
       renderSroi(data);
+      renderSettoreHeroCard(data);
+      renderSettoreScoreStrip(data);
       statusEl.textContent = 'Salvato.';
     } catch (err) {
       console.error(err);

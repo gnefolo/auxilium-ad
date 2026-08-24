@@ -22,24 +22,10 @@ from sqlalchemy.orm import Session
 
 from database import month_key, DimDate, DimSite, DimService, FactFinanceMonthly, FactServiceRevenue
 from sam.multipliers import compute_indirect_impact
-from sam.auxilium_vectors import DIRECT_EMPLOYEES
+from sam.auxilium_vectors import DIRECT_EMPLOYEES, CLUSTER_ALLOCATION_BRANCH
 from sroi.kpi_catalog import get_catalog
 from sroi.benefits_catalog import get_cluster_benefits
 from sroi.project_engine import get_project as get_sroi_project
-
-# Branca ISTAT (NACE*63) usata per stimare l'impatto SAM di un nuovo progetto nel
-# cluster. Coerente con `sam/auxilium_vectors.py`: tutti i cluster su "Assistenza
-# sociale", eccetto la fornitura di personale sociosanitario (più vicina a
-# "Attività dei servizi sanitari").
-CLUSTER_ALLOCATION_BRANCH = {
-    "ADI_SAD": "V87_88",
-    "RSA_Residenziale": "V87_88",
-    "Disabilita": "V87_88",
-    "Minori_Famiglia": "V87_88",
-    "Migranti_Accoglienza": "V87_88",
-    "Prima_Infanzia": "V87_88",
-    "Personale_Sociosanitario": "V86",
-}
 
 REFERENCE_ENTITY = "AUX"
 REFERENCE_YEAR = 2025

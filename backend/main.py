@@ -11,7 +11,7 @@ from database import (
     DimDate, DimEntity, DimSite, DimService, DimScope, DimRiskType,
     FactFinanceMonthly, FactServiceRevenue, FactImpactMonthly,
 )
-from sam.auxilium_vectors import compute_entity_footprint
+from sam.auxilium_vectors import compute_entity_footprint, compute_cluster_footprint
 from sam.benchmark import compute_sector_benchmark
 from sam.multipliers import compute_indirect_impact
 from sroi.engine import compute_sroi_framework, save_cluster_outcome
@@ -346,6 +346,18 @@ def get_sam_footprint(
     """Footprint macroeconomico (Fase 3): effetto diretto (dati di bilancio) + effetto
     indiretto (modello Input-Output ISTAT, 'tipo I') di un'entità del gruppo Auxilium."""
     return compute_entity_footprint(db, entity_key, year)
+
+
+@app.get("/api/sam/cluster-footprint")
+def get_sam_cluster_footprint(
+    cluster: str = Query(...),
+    year: int = Query(2024),
+    db: Session = Depends(get_db),
+):
+    """Footprint macroeconomico di un cluster di servizio (pagina Settore): usa il
+    valore REALE delle commesse del cluster nell'anno come base, a differenza di
+    /api/relazione/genera che stima l'impatto di un budget ipotetico non ancora vinto."""
+    return compute_cluster_footprint(db, cluster, year)
 
 
 @app.get("/api/sroi/catalog")

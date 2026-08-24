@@ -13,9 +13,10 @@ equivalenti" (vedi `multipliers.py` per il metodo di conversione ore->posti), no
 un conteggio - va sempre presentata come tale.
 """
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from database import month_key, FactFinanceMonthly
+from database import month_key, FactFinanceMonthly, FactServiceRevenue, DimService
 from sam.multipliers import compute_indirect_impact
 
 # Occupati (numero medio dichiarato a bilancio, Fase 2) - effetto diretto noto con
@@ -39,6 +40,22 @@ ALLOCATION_BRANCH = {
     "CARE": "V87_88",
     "SRV": "V87_88",
 }
+
+# Branca ISTAT per cluster di servizio (usata sia qui per il footprint reale di
+# cluster, sia in relazione/generator.py per la stima di impatto di un nuovo bando -
+# unica fonte per evitare che le due mappature divergano nel tempo).
+CLUSTER_ALLOCATION_BRANCH = {
+    "ADI_SAD": "V87_88",
+    "RSA_Residenziale": "V87_88",
+    "Disabilita": "V87_88",
+    "Minori_Famiglia": "V87_88",
+    "Migranti_Accoglienza": "V87_88",
+    "Prima_Infanzia": "V87_88",
+    "Personale_Sociosanitario": "V86",
+}
+
+REFERENCE_ENTITY = "AUX"
+REFERENCE_YEAR = 2025
 
 
 def _finance_value(db: Session, entity_key: str, year: int, category: str):
@@ -106,4 +123,73 @@ def compute_entity_footprint(db: Session, entity_key: str, year: int) -> dict:
                     "in multipliers.py), da non confondere con 'employees' (conteggio esatto diretto).",
         }
 
+    return result
+
+
+def _reference_ratios(db: Session) -> dict:
+    """Rapporti reali di Auxilium (bilancio capogruppo) usati come proxy della struttura
+    di spesa/occupazionale quando non abbiamo un bilancio separato per cluster di
+    servizio (i bilanci sono per entità legale, non per cluster)."""
+    valore_produzione = _finance_value(db, REFERENCE_ENTITY, REFERENCE_YEAR, "A_ValoreProduzione")
+    intermediate = (
+        (_finance_value(db, REFERENCE_ENTITY, REFERENCE_YEAR, "B6_MateriePrime") or 0.0)
+        + (_finance_value(db, REFERENCE_ENTITY, REFERENCE_YEAR, "B7_Servizi") or 0.0)
+        + (_finance_value(db, REFERENCE_ENTITY, REFERENCE_YEAR, "B8_GodimentoBeniTerzi") or 0.0)
+    )
+    employees = DIRECT_EMPLOYEES.get((REFERENCE_ENTITY, REFERENCE_YEAR))
+    return {
+        "intermediateConsumptionRatio": (intermediate / valore_produzione) if valore_produzione else None,
+        "employeesPerEuroOutput": (employees / valore_produzione) if (valore_produzione and employees) else None,
+    }
+
+
+def compute_cluster_footprint(db: Session, cluster: str, year: int) -> dict:
+    """Impatto macroeconomico di un cluster di servizio, usando il valore REALE delle
+    commesse del cluster nell'anno (FactServiceRevenue) come base - a differenza di
+    relazione/generator.py, che stima l'impatto di un budget IPOTETICO per un nuovo
+    bando non ancora vinto. Stessa metodologia: spesa intermedia stimata dai rapporti
+    aziendali medi di Auxilium capogruppo (i bilanci non sono disponibili per singolo
+    cluster), poi passata al motore Input-Output ISTAT (Tipo I/Tipo II, Fase 3)."""
+    revenue = (
+        db.query(func.sum(FactServiceRevenue.RevenueEUR))
+        .join(DimService, FactServiceRevenue.ServiceKey == DimService.ServiceKey)
+        .filter(DimService.ServiceCluster == cluster, FactServiceRevenue.MonthKey == month_key(year))
+        .scalar()
+    ) or 0.0
+
+    result = {"cluster": cluster, "year": year, "valoreCommesseEUR": revenue, "impact": None, "total": None}
+    ratios = _reference_ratios(db)
+    if not revenue or ratios["intermediateConsumptionRatio"] is None:
+        return result
+
+    intermediate_estimate = revenue * ratios["intermediateConsumptionRatio"]
+    direct_value_added = revenue - intermediate_estimate
+    direct_jobs_estimate = (
+        revenue * ratios["employeesPerEuroOutput"] if ratios["employeesPerEuroOutput"] else None
+    )
+
+    branch = CLUSTER_ALLOCATION_BRANCH.get(cluster, "V87_88")
+    impact = compute_indirect_impact(intermediate_estimate, branch_code=branch) if intermediate_estimate > 0 else None
+
+    result["ipotesi"] = (
+        f"Spesa intermedia stimata al {ratios['intermediateConsumptionRatio'] * 100:.1f}% del valore delle "
+        f"commesse del cluster (rapporto acquisti/valore della produzione di Auxilium capogruppo, bilancio "
+        f"{REFERENCE_YEAR}). Occupazione diretta stimata dallo stesso rapporto dipendenti/produzione - una "
+        "stima sui rapporti aziendali medi, non un conteggio reale per questo specifico cluster."
+    )
+    result["direct"] = {
+        "outputEUR": revenue, "valueAddedEUR": direct_value_added, "jobsEstimate": direct_jobs_estimate,
+    }
+    result["impact"] = impact
+    if impact:
+        result["total"] = {
+            "type1_leontief": {
+                "outputEUR": revenue + impact["type1_leontief"]["deltaOutputEUR"],
+                "valueAddedEUR": direct_value_added + impact["type1_leontief"]["deltaValueAddedEUR"],
+            },
+            "type2_sam": {
+                "outputEUR": revenue + impact["type2_sam"]["deltaOutputEUR"],
+                "valueAddedEUR": direct_value_added + impact["type2_sam"]["deltaValueAddedEUR"],
+            },
+        }
     return result

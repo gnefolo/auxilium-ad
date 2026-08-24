@@ -7,7 +7,7 @@
   <link rel="icon" type="image/png" href="logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -48,10 +48,43 @@
       <div class="brand-sub">Cruscotto Strategico AD</div>
     </div>
     <nav class="nav-menu">
+      <div class="nav-section-label">Panoramica</div>
       <a href="#" class="nav-item active" data-page="overview">
         <span class="nav-icon">📊</span>
         Overview
       </a>
+
+      <div class="nav-section-label">Settori</div>
+      <a href="#" class="nav-item" data-page="settore" data-cluster="ADI_SAD">
+        <span class="nav-icon">🏠</span>
+        Cure Domiciliari
+      </a>
+      <a href="#" class="nav-item" data-page="settore" data-cluster="RSA_Residenziale">
+        <span class="nav-icon">🏥</span>
+        Residenzialità
+      </a>
+      <a href="#" class="nav-item" data-page="settore" data-cluster="Personale_Sociosanitario">
+        <span class="nav-icon">🩺</span>
+        Servizi Sociosanitari
+      </a>
+      <a href="#" class="nav-item" data-page="settore" data-cluster="Minori_Famiglia">
+        <span class="nav-icon">👨‍👩‍👧</span>
+        Area Minori
+      </a>
+      <a href="#" class="nav-item" data-page="settore" data-cluster="Migranti_Accoglienza">
+        <span class="nav-icon">🤝</span>
+        Accoglienza &amp; Integrazione
+      </a>
+      <a href="#" class="nav-item" data-page="settore" data-cluster="Prima_Infanzia">
+        <span class="nav-icon">🧸</span>
+        Prima Infanzia
+      </a>
+      <a href="#" class="nav-item" data-page="settore" data-cluster="Disabilita">
+        <span class="nav-icon">♿</span>
+        Disabilità
+      </a>
+
+      <div class="nav-section-label">Strumenti</div>
       <a href="#" class="nav-item" data-page="gare">
         <span class="nav-icon">📋</span>
         Gare & Appalti
@@ -59,10 +92,6 @@
       <a href="#" class="nav-item" data-page="footprint">
         <span class="nav-icon">🌍</span>
         Footprint (SAM)
-      </a>
-      <a href="#" class="nav-item" data-page="sroi">
-        <span class="nav-icon">💠</span>
-        SROI
       </a>
       <a href="#" class="nav-item" data-page="sroicalc">
         <span class="nav-icon">🧮</span>
@@ -335,17 +364,45 @@
         </div>
       </div>
 
-      <!-- ============ PAGE: SROI ============ -->
-      <div class="page" id="page-sroi">
+      <!-- ============ PAGE: SETTORE (template condiviso per i 7 cluster di servizio) ============ -->
+      <div class="page" id="page-settore">
 
-        <div class="filter-bar">
-          <div class="filter-group">
-            <label for="clusterSelect">Cluster di servizio</label>
-            <select id="clusterSelect"></select>
+        <div class="settore-hero">
+          <div class="settore-hero-glow settore-hero-glow-1"></div>
+          <div class="settore-hero-glow settore-hero-glow-2"></div>
+          <div class="settore-hero-main">
+            <div class="settore-hero-eyebrow"><span class="pulse-dot"></span>Settore di servizio</div>
+            <h1 class="settore-hero-title" id="settoreHeroTitle"></h1>
+            <p class="settore-hero-desc" id="settoreHeroDesc"></p>
+          </div>
+          <div class="settore-hero-card">
+            <div class="settore-hero-card-label">Valore commesse (<span id="settoreHeroYear"></span>)</div>
+            <div class="settore-hero-card-value" id="settoreHeroValue">N/D</div>
+            <div class="settore-hero-card-badge" id="settoreHeroBadge"></div>
+            <div class="settore-hero-card-grid" id="settoreHeroMiniStats"></div>
           </div>
         </div>
 
-        <div class="sroi-banner" id="sroiBanner">
+        <div class="settore-score-strip" id="settoreScoreStrip"></div>
+
+        <div class="data-grid" style="margin-top:20px; grid-template-columns: 2fr 1fr;">
+          <div class="card glass">
+            <div class="card-header"><h3 class="card-title">Andamento pluriennale — Valore commesse</h3></div>
+            <div class="chart-container"><canvas id="settoreTrendChart"></canvas></div>
+          </div>
+          <div class="card glass">
+            <div class="card-header"><h3 class="card-title">Distribuzione territoriale</h3></div>
+            <div class="stat-list" id="settoreRegioni"></div>
+          </div>
+        </div>
+
+        <div class="card glass" style="margin-top:20px;">
+          <div class="card-header"><h3 class="card-title">Impatto Macroeconomico (SAM)</h3></div>
+          <p class="page-subtitle" id="settoreImpactNote" style="margin-bottom:14px;"></p>
+          <div class="stat-list" id="settoreImpactStats"></div>
+        </div>
+
+        <div class="sroi-banner" id="sroiBanner" style="margin-top:20px;">
           <span class="sroi-banner-label">SROI Ratio — commesse attive<span class="info-icon" tabindex="0">i<span class="tooltip-box">SROI (Social Return On Investment): rapporto tra il valore sociale netto generato e l'investimento. Es. 2,0x = 2€ di valore sociale per ogni €1 investito.</span></span></span>
           <span class="sroi-banner-value">N/D</span>
           <span class="sroi-banner-note" id="sroiBannerNote"></span>
@@ -693,6 +750,19 @@
 
     </div>
   </main>
+
+  <!-- Drawer laterale generico (dettaglio commesse, KPI, ecc.) -->
+  <div class="drawer-overlay" id="drawerOverlay"></div>
+  <aside class="drawer-panel" id="drawerPanel">
+    <div class="drawer-header">
+      <div>
+        <div class="drawer-eyebrow" id="drawerEyebrow"></div>
+        <h3 class="drawer-title" id="drawerTitle"></h3>
+      </div>
+      <button class="icon-btn" id="drawerCloseBtn">✕</button>
+    </div>
+    <div class="drawer-body" id="drawerBody"></div>
+  </aside>
 
   </div><!-- /#appRoot -->
 
