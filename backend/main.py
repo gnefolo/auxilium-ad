@@ -17,6 +17,8 @@ from sam.multipliers import compute_indirect_impact
 from sroi.engine import compute_sroi_framework, save_cluster_outcome
 from sroi.kpi_catalog import get_catalog as get_sroi_catalog
 from sroi import project_engine as sroi_projects
+import tenders as tenders_engine
+import finance_entries as finance_entries_engine
 from relazione.generator import generate_relazione
 from territorio.map_data import get_sites_map_data
 from territorio.anomalie import detect_revenue_anomalies
@@ -515,6 +517,65 @@ def get_app_settings(db: Session = Depends(get_db)):
 def put_app_settings(payload: dict = Body(...), db: Session = Depends(get_db)):
     """Salva le preferenze del cruscotto."""
     return app_settings.save_settings(db, payload)
+
+
+@app.get("/api/tenders")
+def get_tenders(db: Session = Depends(get_db)):
+    """Bandi di gara ATTIVI (da candidarsi), inseriti manualmente dall'ufficio gare.
+    Distinti dallo storico commesse già vinte (/api/service-revenue)."""
+    return tenders_engine.list_tenders(db)
+
+
+@app.post("/api/tenders")
+def post_tender(payload: dict = Body(...), db: Session = Depends(get_db)):
+    return tenders_engine.create_tender(db, payload)
+
+
+@app.get("/api/tenders/{tender_id}")
+def get_tender(tender_id: int, db: Session = Depends(get_db)):
+    result = tenders_engine.get_tender(db, tender_id)
+    return result if result else {"error": "Gara non trovata"}
+
+
+@app.put("/api/tenders/{tender_id}")
+def put_tender(tender_id: int, payload: dict = Body(...), db: Session = Depends(get_db)):
+    result = tenders_engine.update_tender(db, tender_id, payload)
+    return result if result else {"error": "Gara non trovata"}
+
+
+@app.delete("/api/tenders/{tender_id}")
+def delete_tender(tender_id: int, db: Session = Depends(get_db)):
+    tenders_engine.delete_tender(db, tender_id)
+    return {"ok": True}
+
+
+@app.get("/api/finance/entries")
+def get_finance_entries(
+    year: Optional[int] = Query(None),
+    entityKey: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Voci di bilancio (FactFinanceMonthly) inserite manualmente dall'ufficio
+    amministrativo quando arrivano nuovi dati - CRUD di aggiornamento, distinto
+    dalla lettura aggregata di /api/finance."""
+    return finance_entries_engine.list_finance_entries(db, year=year, entity_key=entityKey)
+
+
+@app.post("/api/finance/entries")
+def post_finance_entry(payload: dict = Body(...), db: Session = Depends(get_db)):
+    return finance_entries_engine.create_finance_entry(db, payload)
+
+
+@app.put("/api/finance/entries/{entry_id}")
+def put_finance_entry(entry_id: int, payload: dict = Body(...), db: Session = Depends(get_db)):
+    result = finance_entries_engine.update_finance_entry(db, entry_id, payload)
+    return result if result else {"error": "Voce non trovata"}
+
+
+@app.delete("/api/finance/entries/{entry_id}")
+def delete_finance_entry(entry_id: int, db: Session = Depends(get_db)):
+    finance_entries_engine.delete_finance_entry(db, entry_id)
+    return {"ok": True}
 
 
 if __name__ == "__main__":

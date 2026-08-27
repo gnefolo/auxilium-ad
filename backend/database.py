@@ -237,6 +237,29 @@ class AppSetting(Base):
     Value = Column(String)
 
 
+class Tender(Base):
+    """Bando/opportunità di gara ATTIVA su cui candidarsi, inserita e aggiornata
+    manualmente dall'ufficio gare. Distinta da FactServiceRevenue (commesse già
+    vinte/storico): nessuna fonte open data italiana offre oggi un feed affidabile
+    di bandi attivi filtrabile per settore/regione (ANAC/Piattaforma Contratti
+    Pubblici pubblica dataset solo mensili e differiti, EmPULIA e il portale Gare
+    Basilicata non hanno opendata/RSS pubblici) - vedi nota in DEPLOY.md."""
+    __tablename__ = "tender"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    Cig = Column(String, nullable=True)
+    Ref = Column(String, nullable=True)
+    Nome = Column(String)
+    StazioneAppaltante = Column(String, nullable=True)
+    Settore = Column(String, nullable=True)
+    ImportoEUR = Column(Float, nullable=True)
+    Scadenza = Column(String, nullable=True)
+    Stato = Column(String, default="prep")
+    Urgenza = Column(Integer, default=0)
+    Note = Column(String, nullable=True)
+    DocsJSON = Column(String, nullable=True)
+
+
 def init_db():
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
