@@ -19,6 +19,8 @@ from sroi.kpi_catalog import get_catalog as get_sroi_catalog
 from sroi import project_engine as sroi_projects
 import tenders as tenders_engine
 import finance_entries as finance_entries_engine
+import kpi_values as kpi_values_engine
+import cebas_import
 from relazione.generator import generate_relazione
 from territorio.map_data import get_sites_map_data
 from territorio.anomalie import detect_revenue_anomalies
@@ -547,6 +549,43 @@ def put_tender(tender_id: int, payload: dict = Body(...), db: Session = Depends(
 def delete_tender(tender_id: int, db: Session = Depends(get_db)):
     tenders_engine.delete_tender(db, tender_id)
     return {"ok": True}
+
+
+@app.get("/api/tenders/{tender_id}/history")
+def get_tender_history(tender_id: int, db: Session = Depends(get_db)):
+    """Storico reale delle transizioni di stato di una gara (TenderStatusHistory)."""
+    return tenders_engine.get_tender_history(db, tender_id)
+
+
+@app.post("/api/tenders/import-cebas")
+def post_import_cebas(db: Session = Depends(get_db)):
+    """Importazione assistita di bandi dal Portale Bandi della Regione Basilicata
+    (CeBas) - solo Basilicata, filtro per parola chiave, sempre da verificare
+    sulla fonte originale. EmPULIA non è integrabile (portale non raggiungibile
+    da richieste automatiche). Vedi cebas_import.py."""
+    return cebas_import.import_new_tenders(db)
+
+
+@app.get("/api/kpi-values")
+def get_kpi_values(
+    cluster: str = Query(...),
+    year: int = Query(...),
+    db: Session = Depends(get_db),
+):
+    """Valori di KPI di processo/qualità e di volume di servizio inseriti
+    manualmente per cluster/anno (vedi kpi_values.py) - distinti dai KPI
+    economici calcolati da FactServiceRevenue."""
+    return kpi_values_engine.list_values(db, cluster, year)
+
+
+@app.post("/api/kpi-values")
+def post_kpi_value(payload: dict = Body(...), db: Session = Depends(get_db)):
+    cluster = payload.get("cluster")
+    year = payload.get("year")
+    indicator_id = payload.get("indicatorId")
+    if not cluster or not year or not indicator_id:
+        return {"error": "cluster, year e indicatorId sono obbligatori"}
+    return kpi_values_engine.upsert_value(db, cluster, int(year), indicator_id, payload.get("value"), payload.get("note"))
 
 
 @app.get("/api/finance/entries")

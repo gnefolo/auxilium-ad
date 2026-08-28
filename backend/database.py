@@ -239,11 +239,12 @@ class AppSetting(Base):
 
 class Tender(Base):
     """Bando/opportunità di gara ATTIVA su cui candidarsi, inserita e aggiornata
-    manualmente dall'ufficio gare. Distinta da FactServiceRevenue (commesse già
-    vinte/storico): nessuna fonte open data italiana offre oggi un feed affidabile
-    di bandi attivi filtrabile per settore/regione (ANAC/Piattaforma Contratti
-    Pubblici pubblica dataset solo mensili e differiti, EmPULIA e il portale Gare
-    Basilicata non hanno opendata/RSS pubblici) - vedi nota in DEPLOY.md."""
+    manualmente dall'ufficio gare (o importata da CeBas Basilicata, vedi
+    cebas_import.py, sempre da verificare). Distinta da FactServiceRevenue
+    (commesse già vinte/storico). EmPULIA non è integrabile: il portale non è
+    raggiungibile da richieste automatiche (verificato). CeBas Basilicata non
+    ha un filtro per settore/CPV nè espone scadenza/importo via API pubblica -
+    vedi nota in DEPLOY.md."""
     __tablename__ = "tender"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -258,6 +259,37 @@ class Tender(Base):
     Urgenza = Column(Integer, default=0)
     Note = Column(String, nullable=True)
     DocsJSON = Column(String, nullable=True)
+    Responsabile = Column(String, nullable=True)
+    FonteUrl = Column(String, nullable=True)
+
+
+class TenderStatusHistory(Base):
+    """Log delle transizioni di stato di una gara (Tender), scritto automaticamente
+    da tenders.update_tender() quando il campo Stato cambia - mai inserito a mano."""
+    __tablename__ = "tender_status_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    TenderId = Column(Integer, index=True)
+    OldStato = Column(String, nullable=True)
+    NewStato = Column(String)
+    ChangedAt = Column(String)
+    Note = Column(String, nullable=True)
+
+
+class ClusterKpiValue(Base):
+    """Valore di un indicatore di processo/qualità o di volume di servizio
+    (kpi_catalog.py) inserito manualmente per cluster/anno, quando il dato di
+    monitoraggio operativo non è altrimenti disponibile in questo progetto.
+    Non tocca il calcolo SROI (sroi/engine.py): è un dato informativo separato,
+    mostrato accanto ai KPI economici reali con una fonte chiaramente distinta."""
+    __tablename__ = "cluster_kpi_value"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    ServiceCluster = Column(String, index=True)
+    Year = Column(Integer, index=True)
+    IndicatorId = Column(String, index=True)
+    Value = Column(String)
+    Note = Column(String, nullable=True)
 
 
 def init_db():

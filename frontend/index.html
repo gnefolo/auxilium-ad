@@ -845,22 +845,46 @@ html,body{height:100%;font-family:var(--font);font-size:14px;color:var(--n-800);
         </div>
       </div>
       <div class="kgrid" id="kpiSummaryCards"></div>
+      <div class="g21 mb16">
+        <div class="panel">
+          <div class="phd"><div><div class="ptitle">Confronto tra cluster</div><div class="psub">Valore commesse (anno selezionato) — dato reale</div></div></div>
+          <div style="height:170px;position:relative"><canvas id="kpiCompareChart"></canvas></div>
+        </div>
+        <div class="panel">
+          <div class="phd"><div><div class="ptitle">Trend annuale — cluster selezionato</div><div class="psub">Ricavi FactServiceRevenue per anno</div></div></div>
+          <div style="height:170px;position:relative"><canvas id="kpiTrendChart"></canvas></div>
+        </div>
+      </div>
       <div class="twrap">
         <table class="dtbl">
           <thead><tr><th>Indicatore</th><th>Definizione</th><th>Valore</th><th>Fonte</th><th>Stato</th></tr></thead>
           <tbody id="kpiOperativiTbody"><tr><td colspan="5" style="color:var(--n-400);font-size:12px">Caricamento…</td></tr></tbody>
         </table>
+        <div style="padding:14px;display:flex;justify-content:flex-end">
+          <button class="btn btn-p" style="font-size:12px" onclick="saveManualKpiValues()">Salva monitoraggio</button>
+        </div>
       </div>
     </div>
 
     <!-- ══ VIEW: GARE ══ -->
     <div class="view" id="v-gare">
-      <div class="ph-bar"><div><div class="ph-title">Registro Gare d'Appalto</div><div class="ph-sub" id="gareSub">Caricamento…</div></div><button class="btn btn-p" style="font-size:12px;font-weight:600" onclick="openModal('gara')">+ Nuova gara</button></div>
+      <div class="ph-bar">
+        <div><div class="ph-title">Registro Gare d'Appalto</div><div class="ph-sub" id="gareSub">Caricamento…</div></div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn btn-s" style="font-size:12px" onclick="runCebasImport()" id="cebasImportBtn">Importa da CeBas (Basilicata)</button>
+          <button class="btn btn-p" style="font-size:12px;font-weight:600" onclick="openModal('gara')">+ Nuova gara</button>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--n-400);margin:-8px 0 14px">Importazione assistita, solo Regione Basilicata — verificare sempre i dati sulla fonte originale (link nel dettaglio gara). EmPULIA non è integrabile: il portale non è raggiungibile da richieste automatiche. <span id="cebasImportResult"></span></div>
       <div class="gsum">
         <div class="gc"><span class="gcico">🔵</span><div><div class="gclbl">Pubblicate / in corso</div><div class="gcval" id="gsum-pubbl">—</div></div></div>
         <div class="gc"><span class="gcico">🔴</span><div><div class="gclbl">Scadenza entro 14gg</div><div class="gcval" id="gsum-urg">—</div></div></div>
         <div class="gc"><span class="gcico">🟢</span><div><div class="gclbl">Aggiudicate (ytd)</div><div class="gcval" id="gsum-aggiu">—</div></div></div>
         <div class="gc"><span class="gcico">📦</span><div><div class="gclbl">In preparazione</div><div class="gcval" id="gsum-prep">—</div></div></div>
+      </div>
+      <div class="panel mb16">
+        <div class="phd"><div><div class="ptitle">Prossime scadenze</div><div class="psub">Gare pubblicate, ordinate per scadenza più vicina</div></div></div>
+        <div id="gareUpcoming" style="font-size:12px;color:var(--n-400)">—</div>
       </div>
       <div class="gare-filters">
         <button class="fc active" onclick="fgare(this,'tutti')">Tutte</button>
@@ -929,6 +953,9 @@ html,body{height:100%;font-family:var(--font);font-size:14px;color:var(--n-800);
             <thead><tr><th>Indicatore</th><th>Definizione</th><th>Valore</th><th>Fonte</th><th>Stato</th></tr></thead>
             <tbody id="sh-kpi-rows"></tbody>
           </table>
+          <div style="padding:10px 14px;display:flex;justify-content:flex-end">
+            <button class="btn btn-p" style="font-size:12px" onclick="saveManualKpiValues()">Salva monitoraggio</button>
+          </div>
         </div>
         <div class="panel" style="flex:1">
           <div class="phd"><div><div class="ptitle">Distribuzione territoriale</div><div class="psub">Ricavi per regione (dato reale)</div></div></div>
@@ -1119,7 +1146,8 @@ html,body{height:100%;font-family:var(--font);font-size:14px;color:var(--n-800);
   <div class="dbody">
     <div class="dst">Dati gara</div><div id="d-fields"></div>
     <div class="dst" style="margin-top:14px">Note operative</div><div class="dnote" id="d-note"></div>
-    <div class="dst" style="margin-top:14px">Documenti</div><div id="d-docs"></div>
+    <div class="dst" style="margin-top:14px">Documenti / link</div><div id="d-docs"></div>
+    <div class="dst" style="margin-top:14px">Storico stato</div><div id="d-history" style="font-size:12px;color:var(--n-400)">—</div>
   </div>
   <div class="dfoot"><button class="dfbtn dfbtn-p" onclick="editTenderFromDrawer()">Modifica</button><button class="dfbtn dfbtn-s" onclick="deleteTenderFromDrawer()">Elimina</button><button class="dfbtn dfbtn-s" onclick="closeD()">Chiudi</button></div>
 </div>
@@ -1259,12 +1287,31 @@ let tenders = [];
 function tenderFromApi(t) {
   return {id: t.id, cig: t.cig || '—', ref: t.ref || '—', nome: t.nome, sa: t.stazioneAppaltante || '—',
     settore: t.settore || '—', importo: t.importoEUR || 0, scad: t.scadenza, stato: t.stato || 'prep',
-    urg: t.urgenza || 0, note: t.note || '', docs: t.docs || []};
+    urg: t.urgenza || 0, note: t.note || '', docs: t.docs || [],
+    responsabile: t.responsabile || '', fonteUrl: t.fonteUrl || null};
 }
 function tenderToApi(g) {
   return {nome: g.nome, stazioneAppaltante: g.sa, cig: g.cig, ref: g.ref, settore: g.settore,
-    importoEUR: g.importo, scadenza: g.scad, stato: g.stato, urgenza: g.urg, note: g.note, docs: g.docs || []};
+    importoEUR: g.importo, scadenza: g.scad, stato: g.stato, urgenza: g.urg, note: g.note, docs: g.docs || [],
+    responsabile: g.responsabile, fonteUrl: g.fonteUrl};
 }
+async function runCebasImport() {
+  const btn = document.getElementById('cebasImportBtn');
+  const resultEl = document.getElementById('cebasImportResult');
+  if (btn) { btn.disabled = true; btn.textContent = 'Importazione in corso…'; }
+  if (resultEl) resultEl.textContent = '';
+  try {
+    const res = await apiSend('/tenders/import-cebas', 'POST', {});
+    if (resultEl) resultEl.textContent = `— ultimo import: ${res.controllati} controllati, ${res.nuovi} nuovi, ${res.giaPresenti} già presenti.`;
+    await fetchTenders();
+  } catch (e) {
+    console.error('runCebasImport', e);
+    if (resultEl) resultEl.textContent = '— errore durante l\'importazione.';
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Importa da CeBas (Basilicata)'; }
+  }
+}
+
 async function fetchTenders() {
   try {
     const data = await apiGet('/tenders');
@@ -1291,6 +1338,13 @@ function updateGareSummary() {
     if (urgenti > 0) { navBadge.style.display = ''; navBadge.textContent = urgenti; }
     else navBadge.style.display = 'none';
   }
+
+  const upcoming = tenders.filter(t => t.stato === 'pubbl' && t.scad).sort((a, b) => dU(a.scad) - dU(b.scad)).slice(0, 8);
+  setHtmlById('gareUpcoming', upcoming.length ? upcoming.map(t => {
+    const days = dU(t.scad);
+    const urgent = days >= 0 && days <= 14;
+    return `<div class="drow" style="cursor:pointer" onclick="openD(${t.id})"><span class="dlbl">${t.nome}</span><span class="dval" style="${urgent?'color:var(--aux-red);font-weight:700':''}">${fD(t.scad)} (${days}gg)</span></div>`;
+  }).join('') : 'Nessuna gara pubblicata con scadenza in programma.');
 }
 function updateDashboardTenderCards() {
   const active = tenders.filter(t => t.stato !== 'annul' && t.stato !== 'sospe');
@@ -1356,22 +1410,27 @@ function dU(s){if(!s)return 999;const d=new Date(s),n=new Date();n.setHours(0,0,
 function fD(s){if(!s||s==='—')return'—';return new Date(s).toLocaleDateString('it-IT',{day:'2-digit',month:'short',year:'numeric'})}
 function fI(v){return v>=1e6?'€ '+(v/1e6).toFixed(1).replace('.',',')+'M':'€ '+v.toLocaleString('it-IT')}
 
+const CLUSTER_COLORS = {
+  ADI_SAD: '#2E86C1', RSA_Residenziale: '#1E8449', Personale_Sociosanitario: '#F5A623',
+  Minori_Famiglia: '#8E44AD', Migranti_Accoglienza: '#C0392B', Disabilita: '#004D96', Prima_Infanzia: '#4A5568',
+};
+function settoreLabel(s){ return KPI_CLUSTER_LABELS[s] || s || '—'; }
+
 function renderGare(){
   const b=document.getElementById('gareTbody');
   let d=tenders.filter(g=>gF==='tutti'?true:gF==='scad'?(g.stato==='pubbl'&&dU(g.scad)>=0&&dU(g.scad)<=14):g.stato===gF);
   if(gS){const q=gS.toLowerCase();d=d.filter(g=>g.nome.toLowerCase().includes(q)||g.sa.toLowerCase().includes(q)||g.cig.toLowerCase().includes(q)||g.ref.toLowerCase().includes(q))}
   document.getElementById('gcount').textContent=`${d.length} di ${tenders.length} gare`;
-  const colors={'Cure Domiciliari':'#2E86C1','Residenzialità':'#1E8449','Serv. Ospedalieri':'#E67E22','Area Minori':'#8E44AD','Accoglienza':'#C0392B','Pulizie & Logistica':'#888'};
   b.innerHTML=d.map(g=>{
     const days=dU(g.scad);
     let sc='so',sl=fD(g.scad);
     if(g.stato==='pubbl'){if(days<=7){sc='sh';sl=`⚠ ${days}gg`}else if(days<=14){sc='sw';sl=`${days}gg (${fD(g.scad)})`}}
     const st=stMap[g.stato]||stMap.pubbl;
-    const col=colors[g.settore]||'#8896A7';
+    const col=CLUSTER_COLORS[g.settore]||'#8896A7';
     return`<tr onclick="openD(${g.id})" id="gr-${g.id}">
       <td><div style="font-family:var(--mono);font-size:11px;color:var(--n-400)">${g.cig}</div><div style="font-size:10px;color:var(--n-400)">${g.ref}</div></td>
       <td><div style="font-size:12px;font-weight:500;max-width:250px;line-height:1.3">${g.nome}</div><div style="font-size:11px;color:var(--n-600);margin-top:2px">${g.sa}</div></td>
-      <td><span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--n-600)"><span style="width:6px;height:6px;border-radius:50%;background:${col};display:inline-block"></span>${g.settore}</span></td>
+      <td><span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--n-600)"><span style="width:6px;height:6px;border-radius:50%;background:${col};display:inline-block"></span>${settoreLabel(g.settore)}</span></td>
       <td><span style="font-family:var(--mono);font-size:12px;font-weight:500">${fI(g.importo)}</span></td>
       <td><span class="${sc}" style="font-size:11px">${sl}</span></td>
       <td><span class="gp ${st.c}">${st.l}</span></td>
@@ -1381,7 +1440,7 @@ function renderGare(){
 }
 function fgare(el,f){document.querySelectorAll('.fc').forEach(c=>c.classList.remove('active'));el.classList.add('active');gF=f;renderGare()}
 function sgare(v){gS=v;renderGare()}
-function openD(id){
+async function openD(id){
   const g=tenders.find(x=>x.id===id);if(!g)return;
   if(gSel){const r=document.getElementById('gr-'+gSel);if(r)r.classList.remove('sel')}
   gSel=id;const row=document.getElementById('gr-'+id);if(row)row.classList.add('sel');
@@ -1392,11 +1451,18 @@ function openD(id){
   const days=dU(g.scad);
   let urg='';
   if(g.stato==='pubbl'&&days<=14)urg=`<div style="margin-top:8px;padding:7px 11px;background:#FDEDEB;border-radius:6px;font-size:11px;color:#A93226;font-weight:500">⚠ Scadenza tra ${days} giorni</div>`;
-  document.getElementById('d-fields').innerHTML=[['Stazione appaltante',g.sa],['Settore',g.settore],['Importo a base d\'asta',fI(g.importo)],['Scadenza presentazione',fD(g.scad)],['Stato',st.l],['Riferimento',g.ref]].map(([l,v])=>`<div class="drow"><span class="dlbl">${l}</span><span class="dval">${v}</span></div>`).join('')+urg;
+  const fields=[['Stazione appaltante',g.sa],['Settore',settoreLabel(g.settore)],['Importo a base d\'asta',fI(g.importo)],['Scadenza presentazione',fD(g.scad)],['Stato',st.l],['Riferimento',g.ref],['Responsabile',g.responsabile||'—']];
+  if(g.fonteUrl) fields.push(['Fonte', `<a href="${g.fonteUrl}" target="_blank" rel="noopener">Apri pagina originale ↗</a>`]);
+  document.getElementById('d-fields').innerHTML=fields.map(([l,v])=>`<div class="drow"><span class="dlbl">${l}</span><span class="dval">${v}</span></div>`).join('')+urg;
   document.getElementById('d-note').textContent=g.note;
-  document.getElementById('d-docs').innerHTML=g.docs.map(d=>`<div style="display:flex;align-items:center;gap:7px;padding:7px 9px;background:var(--n-50);border:1px solid var(--n-100);border-radius:6px;font-size:12px;cursor:pointer;margin-bottom:5px;transition:background .12s" onmouseover="this.style.background='var(--n-100)'" onmouseout="this.style.background='var(--n-50)'">📄 <span style="flex:1">${d}</span> <span style="font-size:11px;color:var(--n-400)">↓</span></div>`).join('');
+  document.getElementById('d-docs').innerHTML=(g.docs&&g.docs.length)?g.docs.map(d=>`<div style="display:flex;align-items:center;gap:7px;padding:7px 9px;background:var(--n-50);border:1px solid var(--n-100);border-radius:6px;font-size:12px;margin-bottom:5px">📄 <span style="flex:1">${d}</span></div>`).join(''):'<div style="font-size:12px;color:var(--n-400)">Nessun documento/link inserito.</div>';
+  document.getElementById('d-history').textContent='Caricamento…';
   document.getElementById('dov').classList.add('open');
   document.getElementById('drw').classList.add('open');
+  try {
+    const hist = await apiGet(`/tenders/${id}/history`);
+    document.getElementById('d-history').innerHTML = hist.length ? hist.map(h => `<div class="drow"><span class="dlbl">${fD(h.changedAt.slice(0,10))}</span><span class="dval">${h.oldStato?`${(stMap[h.oldStato]||{l:h.oldStato}).l} → `:''}${(stMap[h.newStato]||{l:h.newStato}).l}</span></div>`).join('') : 'Nessuna transizione registrata.';
+  } catch (e) { console.error('openD/history', e); document.getElementById('d-history').textContent = 'Errore di caricamento.'; }
 }
 function closeD(){document.getElementById('dov').classList.remove('open');document.getElementById('drw').classList.remove('open');if(gSel){const r=document.getElementById('gr-'+gSel);if(r)r.classList.remove('sel');gSel=null}}
 
@@ -1445,7 +1511,13 @@ async function loadSettore(key){
 
   renderClusterOutcomeForm(key, year, fw);
 
-  setHtmlById('sh-kpi-rows', renderKpiCatalogRows(fw));
+  _kpiCtxCluster = key; _kpiCtxYear = year;
+  let manualValues = {};
+  try {
+    const values = await apiGet(`/kpi-values?cluster=${key}&year=${year}`);
+    values.forEach(v => { manualValues[v.indicatorId] = v; });
+  } catch (e) { console.error('loadSettore/kpi-values', e); }
+  setHtmlById('sh-kpi-rows', renderKpiCatalogRows(fw, manualValues));
 
   // Ricavi reali per regione + trend annuale, dallo stesso fetch di /api/service-revenue
   let rows = [];
@@ -1702,10 +1774,27 @@ function initKpiOperativiSelectors() {
     yearSel.innerHTML = years.map(y => `<option value="${y}">Anno ${y}</option>`).join('');
   }
 }
+
+let kpiCompareChart = null;
+let kpiTrendChart = null;
+
+// Riusata dalla Dashboard (Economia per cluster) e da "KPI Operativi" (grafico di confronto).
+async function fetchAllClusterEconomics(year) {
+  const out = [];
+  for (const c of SROI_CLUSTERS) {
+    try {
+      const fw = await apiGet(`/sroi/framework?cluster=${c}&year=${year}`);
+      out.push({cluster: c, eco: fw.economics || {}, sroiRatio: fw.sroiRatio});
+    } catch (e) { console.error('fetchAllClusterEconomics', c, e); out.push({cluster: c, eco: {}, sroiRatio: null}); }
+  }
+  return out;
+}
+
 async function loadKpiOperativi() {
   initKpiOperativiSelectors();
   const cluster = document.getElementById('kpiClusterSel').value;
   const year = document.getElementById('kpiYearSel').value;
+  _kpiCtxCluster = cluster; _kpiCtxYear = year;
   const tbody = document.getElementById('kpiOperativiTbody');
   tbody.innerHTML = '<tr><td colspan="5" style="color:var(--n-400);font-size:12px">Caricamento…</td></tr>';
   let fw;
@@ -1720,11 +1809,56 @@ async function loadKpiOperativi() {
     <div class="kcard kc-r"><div class="ktop"><div class="kico ki-r">👥</div></div><div class="klbl">Utenti in carico</div><div class="kval">${(fw.outcome&&fw.outcome.usersServed)!=null?fw.outcome.usersServed:'N/D'}</div><div class="ksub">Inserito manualmente (outcome)</div></div>
   `;
 
-  tbody.innerHTML = renderKpiCatalogRows(fw);
+  let manualValues = {};
+  try {
+    const values = await apiGet(`/kpi-values?cluster=${cluster}&year=${year}`);
+    values.forEach(v => { manualValues[v.indicatorId] = v; });
+  } catch (e) { console.error('loadKpiOperativi/kpi-values', e); }
+  tbody.innerHTML = renderKpiCatalogRows(fw, manualValues);
+
+  // Confronto tra cluster (anno selezionato)
+  const allEco = await fetchAllClusterEconomics(year);
+  const ccEl = document.getElementById('kpiCompareChart');
+  if (ccEl) {
+    if (kpiCompareChart) { kpiCompareChart.destroy(); kpiCompareChart = null; }
+    kpiCompareChart = new Chart(ccEl.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: allEco.map(e => KPI_CLUSTER_LABELS[e.cluster] || e.cluster),
+        datasets: [{
+          label: 'Valore commesse (€)',
+          data: allEco.map(e => e.eco.valoreCommesseEUR || 0),
+          backgroundColor: allEco.map(e => e.cluster === cluster ? '#5BAD3F' : '#003A70'),
+          borderRadius: 4,
+        }],
+      },
+      options: {responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#1E2937',padding:9,cornerRadius:7,callbacks:{label:c=>' '+(c.raw?fI(c.raw):'—')}}},scales:{x:{grid:{display:false},ticks:{font:{size:9},color:'#8896A7',maxRotation:30,minRotation:30}},y:{grid:{color:'#EAEEf2',lineWidth:.5},ticks:{font:{size:10},color:'#8896A7',callback:v=>(v/1e6).toFixed(0)+'M'},border:{display:false}}}}
+    });
+  }
+
+  // Trend annuale reale del cluster selezionato
+  let revRows = [];
+  try { revRows = await apiGet(`/service-revenue?cluster=${cluster}`); } catch (e) { console.error('loadKpiOperativi/service-revenue', e); }
+  const byYear = {};
+  revRows.forEach(r => { if (r.year) byYear[r.year] = (byYear[r.year] || 0) + (r.revenueEUR || 0); });
+  const years = Object.keys(byYear).map(Number).sort((a, b) => a - b);
+  const tcEl = document.getElementById('kpiTrendChart');
+  if (tcEl) {
+    if (kpiTrendChart) { kpiTrendChart.destroy(); kpiTrendChart = null; }
+    kpiTrendChart = new Chart(tcEl.getContext('2d'), {
+      type: 'bar',
+      data: { labels: years.map(String), datasets: [{label:'Valore commesse (€)', data: years.map(y => byYear[y]), backgroundColor: '#003A70', borderRadius: 4}] },
+      options: {responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#1E2937',padding:9,cornerRadius:7,callbacks:{label:c=>' '+(c.raw?fI(c.raw):'—')}}},scales:{x:{grid:{display:false},ticks:{font:{size:10},color:'#8896A7'}},y:{grid:{color:'#EAEEf2',lineWidth:.5},ticks:{font:{size:10},color:'#8896A7',callback:v=>(v/1e6).toFixed(1)+'M'},border:{display:false}}}}
+    });
+  }
 }
 
+let _kpiCtxCluster = null;
+let _kpiCtxYear = null;
+
 // Riusata sia da "KPI Operativi" (cross-cluster) sia dalle pagine di settore (cluster singolo).
-function renderKpiCatalogRows(fw) {
+function renderKpiCatalogRows(fw, manualValues) {
+  manualValues = manualValues || {};
   const eco = fw.economics || {};
   const catalog = fw.kpiCatalog || {};
   const rows = [];
@@ -1739,18 +1873,46 @@ function renderKpiCatalogRows(fw) {
     else if (k.id === 'costo_per_ora_erogata' && fw.costoPerOraErogataEUR != null) val = fI(fw.costoPerOraErogataEUR);
     else if (k.id === 'crescita_yoy' && eco.crescitaYoY != null) val = (eco.crescitaYoY * 100).toFixed(1).replace('.', ',') + '%';
     else if (econId2Field[k.id] && eco[econId2Field[k.id]] != null) val = (k.unita === 'EUR') ? fI(eco[econId2Field[k.id]]) : eco[econId2Field[k.id]];
-    rows.push({...k, val, computed: val !== 'N/D'});
+    rows.push({...k, val, computed: val !== 'N/D', manual: false});
   });
-  (catalog.processQualityKPIs || []).concat(catalog.serviceVolumeKPIs || []).forEach(k => rows.push({...k, val: 'N/D', computed: false}));
+  (catalog.processQualityKPIs || []).concat(catalog.serviceVolumeKPIs || []).forEach(k => {
+    const mv = manualValues[k.id];
+    rows.push({...k, val: mv ? mv.value : '', computed: false, manual: true});
+  });
 
-  return rows.map(r => `
+  return rows.map(r => {
+    let valCell, statoCell;
+    if (r.manual) {
+      valCell = `<input type="text" id="mkv-${r.id}" value="${r.val || ''}" placeholder="Inserisci valore" style="width:100px;padding:4px 7px;border:1.5px solid var(--n-200);border-radius:6px;font-family:var(--mono);font-size:12px">`;
+      statoCell = r.val ? '<span class="pill p-info">● Inserito manualmente</span>' : '<span class="pill p-gray">● Richiede monitoraggio</span>';
+    } else {
+      valCell = `<span style="font-family:var(--mono);${r.computed?'':'color:var(--n-400)'}">${r.val}</span>`;
+      statoCell = r.computed ? '<span class="pill p-ok">● Calcolato</span>' : '<span class="pill p-gray">● Richiede monitoraggio</span>';
+    }
+    return `
     <tr>
       <td><div style="font-size:12px;font-weight:500">${r.nome}</div></td>
       <td style="font-size:11px;color:var(--n-400)">${r.definizione||''}</td>
-      <td style="font-family:var(--mono);${r.computed?'':'color:var(--n-400)'}">${r.val}</td>
+      <td>${valCell}</td>
       <td style="font-size:11px;color:var(--n-400)">${r.fonte||''}</td>
-      <td>${r.computed?'<span class="pill p-ok">● Calcolato</span>':'<span class="pill p-gray">● Richiede monitoraggio</span>'}</td>
-    </tr>`).join('');
+      <td>${statoCell}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function saveManualKpiValues() {
+  const activeView = document.querySelector('.view.active');
+  if (!activeView || !_kpiCtxCluster || !_kpiCtxYear) return;
+  const inputs = activeView.querySelectorAll('[id^="mkv-"]');
+  for (const el of inputs) {
+    const indicatorId = el.id.replace('mkv-', '');
+    await apiSend('/kpi-values', 'POST', {
+      cluster: _kpiCtxCluster, year: parseInt(_kpiCtxYear), indicatorId, value: el.value,
+    });
+  }
+  showSaveMsg();
+  if (activeView.id === 'v-kpi') loadKpiOperativi();
+  else if (activeView.id === 'v-settore') loadSettore(_kpiCtxCluster);
 }
 
 let _sroiDrawerId = null;
@@ -1826,12 +1988,14 @@ const modalForms = {
       {label:'Stazione appaltante *',id:'mf-sa',type:'text',placeholder:'Es. ASL Taranto'},
       {label:'CIG',id:'mf-cig',type:'text',placeholder:'Es. B4C1D2E3F4'},
       {label:'Riferimento interno',id:'mf-ref',type:'text',placeholder:'Es. GA-2025-025'},
-      {label:'Settore',id:'mf-settore',type:'select',options:['Cure Domiciliari','Residenzialità','Servizi Ospedalieri','Area Minori','Accoglienza & Integrazione','Centri Medici Riabilitativi','Pulizie/Vigilanza/Logistica']},
+      {label:'Settore (cluster reale)',id:'mf-settore',type:'select',options:SROI_CLUSTERS.map(c=>({value:c,label:KPI_CLUSTER_LABELS[c]||c}))},
       {label:'Importo a base d\'asta (€)',id:'mf-importo',type:'number',placeholder:'Es. 4200000'},
       {label:'Scadenza presentazione',id:'mf-scad',type:'date'},
       {label:'Stato',id:'mf-stato',type:'select',options:['pubbl','prep','aggiu','sospe','annul']},
       {label:'Urgenza (1-3)',id:'mf-urg',type:'select',options:['1','2','3']},
+      {label:'Responsabile',id:'mf-responsabile',type:'text',placeholder:'Es. Mario Rossi'},
       {label:'Note operative',id:'mf-note',type:'textarea',placeholder:'Note legali, requisiti speciali, clausole...'},
+      {label:'Documenti / link (uno per riga)',id:'mf-docs',type:'textarea',placeholder:'Es. Bando integrale\nhttps://...'},
     ]
   },
   sroi: {
@@ -1865,7 +2029,7 @@ function openModal(type, editId){
   const fStyle = 'width:100%;padding:8px 11px;border:1.5px solid var(--n-200);border-radius:8px;font-family:var(--font);font-size:13px;color:var(--n-800);background:white;transition:border-color .14s;outline:none';
   document.getElementById('modal-form').innerHTML = cfg.fields.map(f=>{
     let input = '';
-    if(f.type==='select') input = `<select id="${f.id}" style="${fStyle}">${f.options.map(o=>`<option value="${o}">${o}</option>`).join('')}</select>`;
+    if(f.type==='select') input = `<select id="${f.id}" style="${fStyle}">${f.options.map(o=>typeof o==='object'?`<option value="${o.value}">${o.label}</option>`:`<option value="${o}">${o}</option>`).join('')}</select>`;
     else if(f.type==='textarea') input = `<textarea id="${f.id}" rows="3" placeholder="${f.placeholder||''}" style="${fStyle};resize:vertical"></textarea>`;
     else input = `<input type="${f.type}" id="${f.id}" placeholder="${f.placeholder||''}" style="${fStyle}">`;
     return `<div style="margin-bottom:14px"><label style="font-size:11px;font-weight:700;color:var(--n-600);letter-spacing:.4px;text-transform:uppercase;display:block;margin-bottom:5px">${f.label}</label>${input}</div>`;
@@ -1889,6 +2053,8 @@ function openModal(type, editId){
       document.getElementById('mf-stato').value=g.stato||'prep';
       document.getElementById('mf-urg').value=String(g.urg||1);
       document.getElementById('mf-note').value=g.note||'';
+      document.getElementById('mf-responsabile').value=g.responsabile||'';
+      document.getElementById('mf-docs').value=(g.docs||[]).join('\n');
     }
   }
   const ov = document.getElementById('modal-ov');
@@ -1935,7 +2101,8 @@ document.getElementById('modal-save').addEventListener('click', async function()
       stato: document.getElementById('mf-stato')?.value || 'prep',
       urgenza: parseInt(document.getElementById('mf-urg')?.value) || 1,
       note: document.getElementById('mf-note')?.value || '',
-      docs: [],
+      responsabile: document.getElementById('mf-responsabile')?.value || null,
+      docs: (document.getElementById('mf-docs')?.value || '').split('\n').map(s => s.trim()).filter(Boolean),
     };
     if(_modalEditId) await apiSend(`/tenders/${_modalEditId}`, 'PUT', payload);
     else await apiSend('/tenders', 'POST', payload);
