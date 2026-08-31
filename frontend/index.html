@@ -1954,6 +1954,41 @@ async function saveManualKpiValues() {
   else if (activeView.id === 'v-settore') loadSettore(_kpiCtxCluster);
 }
 
+let sroiProjects = [];
+async function fetchSroiProjects() {
+  try {
+    sroiProjects = await apiGet('/sroi/projects');
+  } catch (e) { console.error('fetchSroiProjects', e); sroiProjects = []; }
+  renderSroiProjects();
+  updateSroiSummary();
+}
+const SROI_STATUS_PILL = {'In corso':'<span class="pill p-ok">● In corso</span>','Concluso':'<span class="pill p-info">● Concluso</span>','Archiviato':'<span class="pill p-gray">● Archiviato</span>'};
+function renderSroiProjects() {
+  const b = document.getElementById('sroiTbody');
+  if (!b) return;
+  if (!sroiProjects.length) { b.innerHTML = '<tr><td colspan="8" style="color:var(--n-400);font-size:12px">Nessun progetto inserito. Usa "+ Nuovo progetto" per aggiungerne uno.</td></tr>'; return; }
+  b.innerHTML = sroiProjects.map(p => `
+    <tr onclick="openSroi(${p.id})" style="cursor:pointer">
+      <td><div style="font-size:12px;font-weight:500">${p.name}</div></td>
+      <td>${settoreLabel(p.serviceCluster)}</td>
+      <td style="font-family:var(--mono)">${p.year || '—'}</td>
+      <td style="font-family:var(--mono)">${p.sroiRatio != null ? p.sroiRatio.toFixed(1).replace('.', ',') + '×' : 'N/D'}</td>
+      <td style="font-family:var(--mono)">${p.vanSocialeEUR != null ? fI(p.vanSocialeEUR) : 'N/D'}</td>
+      <td style="font-family:var(--mono)">${fI(p.totalInvestmentEUR || 0)}</td>
+      <td style="font-size:11px;color:var(--n-600)">${p.purpose || '—'}</td>
+      <td>${SROI_STATUS_PILL[p.status] || ''}</td>
+    </tr>`).join('');
+}
+function updateSroiSummary() {
+  const withRatio = sroiProjects.filter(p => p.sroiRatio != null);
+  const avgRatio = withRatio.length ? withRatio.reduce((s, p) => s + p.sroiRatio, 0) / withRatio.length : null;
+  setText('sroi-sum-ratio', avgRatio != null ? avgRatio.toFixed(1).replace('.', ',') + '×' : '—');
+  setText('sroi-sum-van', sroiProjects.length ? fI(sroiProjects.reduce((s, p) => s + (p.vanSocialeEUR || 0), 0)) : '—');
+  setText('sroi-sum-count', sroiProjects.length || '—');
+  setHtmlById('sroi-sum-count-sub', sroiProjects.length ? `${withRatio.length} con benefici quantificati` : '&nbsp;');
+  setText('sroi-sum-invest', sroiProjects.length ? fI(sroiProjects.reduce((s, p) => s + (p.totalInvestmentEUR || 0), 0)) : '—');
+}
+
 let _sroiDrawerId = null;
 async function openSroi(id){
   const detail = await apiGet(`/sroi/projects/${id}`); if(!detail || detail.error) return;
