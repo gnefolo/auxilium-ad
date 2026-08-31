@@ -1465,6 +1465,7 @@ async function openD(id){
   } catch (e) { console.error('openD/history', e); document.getElementById('d-history').textContent = 'Errore di caricamento.'; }
 }
 function closeD(){document.getElementById('dov').classList.remove('open');document.getElementById('drw').classList.remove('open');if(gSel){const r=document.getElementById('gr-'+gSel);if(r)r.classList.remove('sel');gSel=null}}
+function closeD2(){document.getElementById('dov2').classList.remove('open');document.getElementById('drw2').classList.remove('open')}
 
 /* ── SETTORI DATA ── */
 
@@ -1880,17 +1881,17 @@ function renderKpiCatalogRows(fw, manualValues) {
     rows.push({...k, val: mv ? mv.value : '', computed: false, manual: true});
   });
 
-  return rows.map(r => {
+  const html = rows.map(r => {
     let valCell, statoCell;
     if (r.manual) {
-      valCell = `<input type="text" id="mkv-${r.id}" value="${r.val || ''}" placeholder="Inserisci valore" style="width:100px;padding:4px 7px;border:1.5px solid var(--n-200);border-radius:6px;font-family:var(--mono);font-size:12px">`;
+      valCell = `<input type="text" id="mkv-${r.id}" value="${r.val || ''}" placeholder="Inserisci valore" onclick="event.stopPropagation()" style="width:100px;padding:4px 7px;border:1.5px solid var(--n-200);border-radius:6px;font-family:var(--mono);font-size:12px">`;
       statoCell = r.val ? '<span class="pill p-info">● Inserito manualmente</span>' : '<span class="pill p-gray">● Richiede monitoraggio</span>';
     } else {
       valCell = `<span style="font-family:var(--mono);${r.computed?'':'color:var(--n-400)'}">${r.val}</span>`;
       statoCell = r.computed ? '<span class="pill p-ok">● Calcolato</span>' : '<span class="pill p-gray">● Richiede monitoraggio</span>';
     }
     return `
-    <tr>
+    <tr onclick="openKpiRowDetail('${r.id}')" style="cursor:pointer">
       <td><div style="font-size:12px;font-weight:500">${r.nome}</div></td>
       <td style="font-size:11px;color:var(--n-400)">${r.definizione||''}</td>
       <td>${valCell}</td>
@@ -1898,6 +1899,44 @@ function renderKpiCatalogRows(fw, manualValues) {
       <td>${statoCell}</td>
     </tr>`;
   }).join('');
+  _lastKpiRows = rows;
+  return html;
+}
+
+let _lastKpiRows = [];
+
+function openKpiRowDetail(indicatorId) {
+  const r = _lastKpiRows.find(x => x.id === indicatorId);
+  if (!r) return;
+  _sroiDrawerId = null; setHtmlById('d2-foot-extra', '');
+  const clusterLabel = KPI_CLUSTER_LABELS[_kpiCtxCluster] || _kpiCtxCluster || '—';
+  document.getElementById('d2-eyebrow').textContent = `KPI · ${clusterLabel} · Anno ${_kpiCtxYear || '—'}`;
+  document.getElementById('d2-title').textContent = r.nome;
+  let statusPill;
+  if (r.manual) statusPill = r.val ? '<span class="pill p-info">● Inserito manualmente</span>' : '<span class="pill p-gray">● Richiede monitoraggio</span>';
+  else statusPill = r.computed ? '<span class="pill p-ok">● Calcolato</span>' : '<span class="pill p-gray">● Richiede monitoraggio</span>';
+  document.getElementById('d2-status').innerHTML = statusPill;
+  document.getElementById('d2-body').innerHTML = `
+    <div class="dst">Valore</div>
+    <div style="background:var(--n-50);border-radius:10px;padding:16px;border:1.5px solid var(--n-100);margin-bottom:4px">
+      <div style="font-size:28px;font-weight:700;font-family:var(--mono);color:var(--navy);letter-spacing:-1px">${r.val || 'N/D'}</div>
+      ${r.unita ? `<div style="font-size:11px;color:var(--n-400);margin-top:4px">Unità: ${r.unita}</div>` : ''}
+    </div>
+    <div class="dst" style="margin-top:16px">Dettaglio</div>
+    <div class="drow"><span class="dlbl">Definizione</span><span class="dval">${r.definizione || '—'}</span></div>
+    <div class="drow"><span class="dlbl">Fonte</span><span class="dval">${r.fonte || '—'}</span></div>
+    <div class="drow"><span class="dlbl">Cluster</span><span class="dval">${clusterLabel}</span></div>
+    <div class="drow"><span class="dlbl">Anno</span><span class="dval">${_kpiCtxYear || '—'}</span></div>
+    ${r.manual ? `
+    <div class="dst" style="margin-top:16px">Note</div>
+    <div class="dnote">Valore inserito manualmente dall'ufficio competente — non calcolato da FactServiceRevenue. Per modificarlo, aggiorna il campo nella tabella e premi "Salva monitoraggio".</div>
+    ` : `
+    <div class="dst" style="margin-top:16px">Note</div>
+    <div class="dnote">${r.computed ? 'Calcolato automaticamente dai dati reali (FactServiceRevenue).' : 'Nessun dato disponibile: richiede una fonte di monitoraggio operativo non ancora presente in questo progetto.'}</div>
+    `}
+  `;
+  document.getElementById('dov2').classList.add('open');
+  document.getElementById('drw2').classList.add('open');
 }
 
 async function saveManualKpiValues() {
